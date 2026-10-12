@@ -1,0 +1,11 @@
+matplotlib
+scipy
+pandas
+tqdm
+numba>=0.60
+psutil
+nbformat
+nbconvert
+IPython
+pytest
+nbmake
