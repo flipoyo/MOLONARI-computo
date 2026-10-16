@@ -57,7 +57,7 @@ class Layer:
         sampled_vals = [prior.sample() for prior in self.Prior_list]
         self.mcmc_params = Param(*sampled_vals)
     
-    def perturb(self, param):
+    def perturb(self):
         """Met à jour mcmc_params en appliquant une perturbation à chaque valeur."""
         perturbed_vals = [
             prior.perturb(val)

@@ -179,11 +179,9 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
         return len(self._times)
 
     def get_dt(self):
-        nt = self.get_timelength()
-        # print(f"number of time steps =  {nt}")
-        dt = (self._times[-1] - self._times[0]).total_seconds()
-        dt /= nt
-        # print(f"time step in seconds =  {dt}")
+        # mean time step = mean of the actual intervals between successive measurements
+        steps = np.diff(self._times)
+        dt = np.mean([step.total_seconds() for step in steps])
         return dt
 
     def get_dt_in_days(self):
@@ -1465,18 +1463,14 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
     @compute_mcmc.needed
     def sample_param(self):
         # retourne aléatoirement un des couples de paramètres parlesquels est passé la MCMC
-        return choice(
-            [[layer.mcmc_params for layer in state.layers] for state in self._states]
-        )
+        return choice(self.get_all_params())
 
     # erreur si pas déjà éxécuté compute_mcmc, sinon l'attribut pas encore affecté à une valeur
     @compute_mcmc.needed
     def get_best_param(self):
         """return the params that minimize the energy"""
-        return [
-            layer.mcmc_params
-            for layer in min(self._states, key=attrgetter("energy")).layers
-        ]  # retourne le couple de paramètres minimisant l'énergie par lequels est passé la MCMC
+        i_best = min(range(len(self._states)), key=lambda i: self._states[i].energy)
+        return self.get_all_params()[i_best] # retourne le couple de paramètres minimisant l'énergie par lequels est passé la MCMC
 
     @compute_mcmc.needed
     def get_best_sigma2(self):
@@ -1559,7 +1553,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
 
     @compute_mcmc.needed
     def get_all_energy(self):
-        return self._initial_energies + [state.energy for state in self._states]
+        return [state.energy for state in self._states]
 
     all_energy = property(get_all_energy)
 
