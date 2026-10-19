@@ -81,8 +81,7 @@ ALPHA = 0.6
 G = 9.81
 EPSILON = 1e-10
 N_UPDATE_MU = 96
-MU = 1e-3
-MU_W = 1e-3
+MU_W = 1e-3  # dynamic viscosity of water (Pa.s) at about 20 °C, used while the temperature law MU_A..MU_D is disabled
 ZERO_CELSIUS = 273.15
 QUANTILE_MIN = 0.05
 MEDIANE = 0.5
@@ -131,7 +130,6 @@ MU_A = 1.856e-11 * 1e-3
 MU_B = 4209
 MU_C = 0.04527
 MU_D = -3.376e-5
-DEFAULT_MU = 1e-3
 
 # VALEURS
 NB_CELLS = 60

@@ -63,7 +63,7 @@ class Linear_system:
     def compute_Mu(self, T):
         # mu = MU_A * np.exp(MU_B * 1.0 / T + MU_C * T + MU_D * (T**2)) # Error when executing the MCMC : RuntimeWarning: overflow encountered in exp
         # mu = MU_A * np.exp(MU_B * 1.0 / T + MU_C * T + MU_D * (T**2))
-        mu = DEFAULT_MU
+        mu = MU_W
         return mu
 
     # @njit

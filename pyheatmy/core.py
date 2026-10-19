@@ -242,7 +242,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
             ## pour le cas uni-couche, on le simule dans H_stratified avec deux couches de mêmes paramètres
             array_IntrinK = np.array([IntrinK, IntrinK])
             # array_K = 10 ** (-array_IntrinK * 1.0)
-            array_K = (RHO_W * G * 10.0**-array_IntrinK) * 1.0 / MU
+            array_K = (RHO_W * G * 10.0**-array_IntrinK) * 1.0 / MU_W
             array_Ss = np.array([Ss, Ss])
             list_zLow = np.array([0.2])
             inter_cara = np.array([[nb_cells // 2, 0]])
@@ -2147,16 +2147,9 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
             close_printable_file(fp)
 
     def sample_params_from_priors(self):
-        # Function updating the parameters of the different layers of the column with the sampled values from the priors
-
+        # each layer samples its own parameters from its priors (Layer.sample)
         for layer in self.all_layers:
-            layer.mcmc_params = Param(
-                layer.Prior_IntrinK.sample(),
-                layer.Prior_n.sample(),
-                layer.Prior_lambda_s.sample(),
-                layer.Prior_rhos_cs.sample(),
-                layer.Prior_q_s.sample(),
-            )
+            layer.sample()
 
     def _get_list_mcmc_params(self):
         """
@@ -2173,18 +2166,9 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
         return [layer.get_physical_params() for layer in self.all_layers]
 
     def perturb_params(self):
-        # Function that updates the parameters of the different layers of the column with perturbated with restpect to the priors
-
+        # each layer perturbs its own parameters within its priors (Layer.perturb)
         for layer in self.all_layers:
-            layer.mcmc_params = Param(
-                layer.Prior_IntrinK.perturb(
-                    layer.mcmc_params.IntrinK
-                ),  # on perturbe la valeur précédente du paramètre IntrinK selon l'écart type donné dans le prior
-                layer.Prior_n.perturb(layer.mcmc_params.n),
-                layer.Prior_lambda_s.perturb(layer.mcmc_params.lambda_s),
-                layer.Prior_rhos_cs.perturb(layer.mcmc_params.rhos_cs),
-                layer.Prior_q_s.perturb(layer.mcmc_params.q_s),
-            )
+            layer.perturb()
 
 
 def compute_energy(temp_simul, temp_ref, sigma2, sigma2_distrib):
