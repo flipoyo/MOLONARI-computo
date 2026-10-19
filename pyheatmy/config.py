@@ -87,7 +87,7 @@ QUANTILE_MIN = 0.05
 MEDIANE = 0.5
 QUANTILE_MAX = 0.95
 N_PARAM_MCMC = 5
-GAMMA_FACTOR = 2.38
+GAMMA_FACTOR = 2.38  # DREAM jump scale: gamma = GAMMA_FACTOR / sqrt(2 * delta * d*)
 
 
 class DeviceType(Enum):

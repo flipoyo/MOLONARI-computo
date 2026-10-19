@@ -860,7 +860,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
             a = np.random.choice(available_indices, delta, replace=False)
             remaining_indices = np.setdiff1d(available_indices, a)
             b = np.random.choice(remaining_indices, delta, replace=False)
-            gamma = 2.38 / np.sqrt(2 * d_star * delta)
+            gamma = GAMMA_FACTOR / np.sqrt(2 * d_star * delta)
             gamma = np.random.choice([gamma, 1], 1, [0.8, 0.2])
 
             # Le calcul de dX ne se fait que sur les indices où A est True.
@@ -1325,7 +1325,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                 self.compute_solve_transi(verbose=False)
                 self._states.append(
                     State(
-                        layers=self.get_list_current_params(),
+                        layers=self._get_list_mcmc_params(),
                         energy=compute_energy(
                             self.temperatures_solve[ind_ref, :],
                             temp_ref,
@@ -1383,7 +1383,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
 
                     self._states.append(
                         State(
-                            layers=self.get_list_current_params(),
+                            layers=self._get_list_mcmc_params(),
                             energy=Energy_Proposal,
                             ratio_accept=nb_accepted / (i + 1),
                             sigma2_temp=sigma2_temp_proposal,
