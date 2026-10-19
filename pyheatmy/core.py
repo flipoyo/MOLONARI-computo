@@ -3,6 +3,7 @@ from random import random, choice
 from operator import attrgetter
 from numbers import Number
 import sys
+import warnings
 import psutil
 import types
 
@@ -37,7 +38,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
         T_measures: list,  # liste contenant un tuple avec la date et la température aux points de mesure de longueur le nombre de temps mesuré
         sigma_meas_P: float = None,  # écart type de l'incertitude sur les valeurs de pression capteur
         sigma_meas_T: float = None,  # écart type de l'incertitude sur les valeurs de température capteur
-        all_layers: list[Layer] = [],  # liste des couches de la colonne
+        all_layers: list[Layer] = None,  # liste des couches de la colonne (ou plus tard avec set_layers)
         inter_mode: str = "linear",  # mode d'interpolation du profil de température initial : 'lagrange' ou 'linear'
         eps=EPSILON,
         nb_cells=NB_CELLS,
@@ -72,6 +73,8 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
         self.zbed = river_bed  # profondeur du lit de la rivière
 
         self.all_layers = []  # liste des couches de la colonne
+        if all_layers:  # layers can be given here or later with set_layers (B-20)
+            self.set_layers(all_layers)
 
         self._z_solve = (
             None  # le tableau contenant la profondeur du milieu des cellules
@@ -130,6 +133,25 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
         self.all_layers = sorted(
             self.all_layers, key=lambda x: x.zLow
         )  # we're sorting the layerlist by increasing zLow
+
+    def _check_layers_geometry(self):
+        # the layers must fill the column from the river bed down to its bottom, the deepest sensor (B-19)
+        if not self.all_layers:
+            raise ValueError("No layer in the column: call set_layers before computing.")
+        bottom = self._real_z[-1]
+        for layer in self.all_layers[:-1]:
+            if not self._real_z[0] < layer.zLow < bottom - EPSILON:
+                raise ValueError(
+                    f"The boundary below layer '{layer.name}' (zLow = {layer.zLow} m) is outside the column, "
+                    f"whose bottom (deepest sensor, offset included) is at {bottom} m."
+                )
+        last = self.all_layers[-1]
+        if last.zLow < bottom - EPSILON:
+            warnings.warn(
+                f"The last layer '{last.name}' ends at zLow = {last.zLow} m, above the column bottom ({bottom} m): "
+                f"it is extended down to the bottom.",
+                UserWarning,
+            )
 
     def initialization(self, nb_cells):
         self._nb_cells = nb_cells
@@ -190,6 +212,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
 
     @checker
     def compute_solve_transi(self, verbose=True):
+        self._check_layers_geometry()
         layersList = self.all_layers
         nb_cells = self._nb_cells
 
@@ -248,7 +271,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
             inter_cara = np.array([[nb_cells // 2, 0]])
             z_solve = self._z_solve.copy()
             IntrinK_list, n_list, lambda_s_list, rhos_cs_list, q_s_list = (
-                getListParameters(layersList, nb_cells)
+                getListParameters(layersList, self._z_solve)
             )
             Ss_list = n_list / heigth
 
@@ -354,7 +377,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
             T_aq = self._T_aq
 
             IntrinK_list, n_list, lambda_s_list, rhos_cs_list, q_s_list = (
-                getListParameters(layersList, nb_cells)
+                getListParameters(layersList, self._z_solve)
             )
 
             array_IntrinK = np.array(
@@ -370,11 +393,10 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                 np.array([float(x.get_physical_params().n) for x in layersList])
                 / heigth
             )
-            array_eps = np.zeros(len(layersList))  # eps de chaque couche
-            array_eps[0] = layersList[0].zLow
+            # thickness of each layer inside the column; the last layer ends at the column bottom (B-19)
+            z_bounds = [layer.zLow for layer in layersList[:-1]] + [self._real_z[-1]]
+            array_eps = np.diff(z_bounds, prepend=self._real_z[0])
 
-            for idx in range(1, len(layersList)):
-                array_eps[idx] = layersList[idx].zLow - layersList[idx - 1].zLow
             array_Hinter = np.zeros(
                 len(layersList) + 1
             )  # charge hydraulique de chaque interface
@@ -740,7 +762,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
         dz = self._z_solve[1] - self._z_solve[0]  # pas en profondeur
         nb_cells = len(self._z_solve)
 
-        _, n_list, lambda_s_list, _, _ = getListParameters(self.all_layers, nb_cells)
+        _, n_list, lambda_s_list, _, _ = getListParameters(self.all_layers, self._z_solve)
 
         lambda_m_list = (
             n_list * (LAMBDA_W) ** 0.5 + (1.0 - n_list) * (lambda_s_list) ** 0.5
@@ -1028,7 +1050,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                 _flow_iter_chain[j] = column.get_flows_solve()
                 self._states.append(
                     State(
-                        layers=X[j],
+                        layers=X[j].copy(), # copy: X[j] is overwritten in place on acceptance
                         energy=Energy[j],
                         ratio_accept=1,
                         sigma2_temp=sigma2_temp_prior.sample(),
@@ -1116,6 +1138,9 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                         _temp_iter_chain[j] = (
                             temp_proposal  # actualisation du profil de température
                         )
+
+                        _flow_iter_chain[j] = column.get_flows_solve()  # actualisation du débit (B-08)
+
 
                     else:
                         dX = np.zeros((nb_layer, nb_param))
@@ -1206,8 +1231,6 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                     temp_proposal = (
                         column.get_temperatures_solve()
                     )  # récupération du profil de température
-                    _temp_iter_chain[j] = temp_proposal
-                    _flow_iter_chain[j] = column.get_flows_solve()
 
                     Energy_Proposal = compute_energy(
                         temp_proposal[ind_ref],
@@ -1227,9 +1250,12 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                         Energy[j] = Energy_Proposal
                         self._acceptance[j] += 1
 
+                        _temp_iter_chain[j] = temp_proposal
+                        _flow_iter_chain[j] = column.get_flows_solve()
+
                         self._states.append(
                             State(
-                                layers=X[j],
+                                layers=X[j].copy(), # copy: X[j] is overwritten in place on acceptance
                                 energy=Energy[j],
                                 ratio_accept=1,
                                 sigma2_temp=sigma2_temp_proposal,
@@ -1289,7 +1315,6 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
             _flows = np.zeros(
                 (sizesubsampling, self._nb_cells, len(self._times)), np.float32
             )  # stockage des débits sous échantillonées pendant la mcmc
-            self._acceptance = 0  # taux d'acceptation
 
             for i in trange(nitmaxburning, desc="Init Mcmc ", file=sys.stdout):
                 # on tire un jeu de paramètres aléatoires selon les priors
@@ -1319,7 +1344,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
             for l, layer in enumerate(self.all_layers):
                 layer.mcmc_params = Param(*self._states[0].layers[l])
 
-            self._acceptance = np.zeros(nb_iter)
+            self.compute_solve_transi(verbose=False)
 
             _temp_iter = self.get_temperatures_solve()
             _flow_iter = self.get_flows_solve()
@@ -1338,8 +1363,6 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
 
                 # on calcule l'énergie pour les nouveaux paramètres
                 self.compute_solve_transi(verbose=False)
-                _temp_iter = self.get_temperatures_solve()
-                _flow_iter = self.get_flows_solve()
 
                 Energy_Proposal = compute_energy(
                     self.temperatures_solve[ind_ref, :],
@@ -1354,6 +1377,10 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
 
                 if np.log(random()) < log_ratio_accept:
                     nb_accepted += 1
+
+                    _temp_iter = self.get_temperatures_solve()
+                    _flow_iter = self.get_flows_solve()
+
                     self._states.append(
                         State(
                             layers=self.get_list_current_params(),
@@ -1376,7 +1403,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                     _temp[k] = _temp_iter[::n_sous_ech_space, ::n_sous_ech_time]
                     _flows[k] = _flow_iter[::n_sous_ech_space, ::n_sous_ech_time]
 
-            self._acceptance = nb_accepted / (nb_iter + 1)
+            self._acceptance = nb_accepted / nb_iter
 
             if verbose == True:
                 print(f"Acceptance rate : {self._acceptance}")
@@ -1393,8 +1420,6 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
             quant: res
             for quant, res in zip(quantile, np.quantile(_flows, quantile, axis=0))
         }
-
-        self._acceptance = self._acceptance / nb_iter
 
         if verbose == True:
             print("Quantiles computed")
