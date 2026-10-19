@@ -2,7 +2,6 @@ from typing import List, Sequence, Union
 from random import random, choice
 from operator import attrgetter
 from numbers import Number
-from datetime import datetime
 import sys
 import psutil
 import types
@@ -41,7 +40,6 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
         all_layers: list[Layer] = [],  # liste des couches de la colonne
         inter_mode: str = "linear",  # mode d'interpolation du profil de température initial : 'lagrange' ou 'linear'
         eps=EPSILON,
-        q_s_list=np.ndarray,  # liste des débits spécifiques (.s-1) source pour chaque couche
         nb_cells=NB_CELLS,
         rac="~/OUTPUT_MOLONARI1D/generated_data",  # printing directory by default,
         verbose=False,
@@ -91,7 +89,6 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
 
         # liste contenant des objets de classe état et de longueur le nombre d'états acceptés par la MCMC (<=nb_iter), passe à un moment par une longueur de 1000 pendant l'initialisation de MCMC
         self._states = list()
-        self._acceptances = None
         # dictionnaire indexé par les quantiles (0.05,0.5,0.95) à qui on a associe un array de deux dimensions : dimension 1 les profondeurs, dimension 2 : liste des valeurs de températures associées au quantile, de longueur les temps de mesure
         self._quantiles_temperatures = None
         # dictionnaire indexé par les quantiles (0.05,0.5,0.95) à qui on a associe un array de deux dimensions : dimension 1 les profondeurs, dimension 2 : liste des valeurs de débits spécifiques associés au quantile, de longueur les temps de mesure
@@ -136,13 +133,6 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
 
     def initialization(self, nb_cells):
         self._nb_cells = nb_cells
-        self.initialize_q_s_list()
-
-    def initialization_nb_cells(self, nb_cells):
-        self._nb_cells = nb_cells
-
-    def initialize_q_s_list(self):
-        self._q_s_list = np.zeros((self._nb_cells, len(self._times)))
 
     def tests(self):
         # teste que les données sont aux bons formats
@@ -223,14 +213,6 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
             )  # le tableau des pas de temps (dépend des données d'entrée)
             isdtconstant = np.all(all_dt == all_dt[0])
 
-            all_dt = np.array(
-                [
-                    (self._times[j + 1] - self._times[j]).total_seconds()
-                    for j in range(len(self._times) - 1)
-                ]
-            )  # le tableau des pas de temps (dépend des données d'entrée)
-            isdtconstant = np.all(all_dt == all_dt[0])
-
             H_init = self._dH[0] - self._dH[0] * self._z_solve / self._real_z[-1]
             # fixe toutes les charges de l'aquifère à 0 (à tout temps)
             H_aq = np.zeros(len(self._times))
@@ -261,7 +243,6 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
             array_IntrinK = np.array([IntrinK, IntrinK])
             # array_K = 10 ** (-array_IntrinK * 1.0)
             array_K = (RHO_W * G * 10.0**-array_IntrinK) * 1.0 / MU
-            array_q_s = np.array([q_s, q_s])
             array_Ss = np.array([Ss, Ss])
             list_zLow = np.array([0.2])
             inter_cara = np.array([[nb_cells // 2, 0]])
@@ -459,16 +440,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                         / array_eps[idx]
                         * (list_array_L[idx] - 0)
                     )
-            # if verbose:
-            #     print("charge hydraulique sur chaque interface", array_Hinter)
-            #     for idx in range(len(list_array_L)):
-            #         plt.plot(list_array_H[idx], list_array_L[idx], label = 'couche ' + str(idx + 1))
-            #     plt.plot(H_init, self._z_solve, linestyle = '--', label = 'solution originale')
-            #     plt.legend()
-            #     plt.title("charge hydraulique stratifiée initialisé")
-            #     plt.xlabel('la charge hydraulique (m)')
-            #     plt.ylabel('le profondeur (m)')
-            #     plt.show()
+    
             H_init = list_array_H[0]
             for idx in range(1, len(list_array_H)):
                 H_init = np.concatenate((H_init, list_array_H[idx]))
@@ -557,10 +529,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
             # ###
 
             # création d'un tableau du gradient de la charge selon la profondeur, calculé à tout temps
-            # conversion of intrinsec permeability to permeability missing
-            # K_list = RHO_W * G * k_list * 1.0 / MU
             K_list = calc_K(IntrinK_list)
-            # print(f"calculating flow in multilayer with permeability {K_list}")
 
             nablaH = H_strat.nablaH()
 
@@ -568,8 +537,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
 
             for i in range(nb_cells):
                 flows[i, :] = -K_list[i] * nablaH[i, :]
-            # if verbose:
-            #     plt.plot(z_solve, flows[:,0], linestyle = '--', label = "avant réparation de dérivation")
+
             for elem_idx in range(len(inter_cara)):
                 if inter_cara[elem_idx][1] == 0:
                     if (
@@ -619,14 +587,6 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                         * nablaH[int(inter_cara[elem_idx][1]), :]
                     )
 
-            # if verbose:
-            #     plt.plot(z_solve, flows[:,0], label = "après réparation de dérivation")
-            #     plt.legend()
-            #     plt.title("flux")
-            #     plt.xlabel("le profondeur (m)")
-            #     plt.ylabel("débit (m/s)")
-            #     plt.show()
-
             ## zhan Nov8
             T_strat = T_stratified(
                 nablaH,
@@ -653,9 +613,6 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
             self._flows = flows  # calcul du débit spécifique
             if verbose:
                 print("Done.")
-            # if verbose:
-            #     plt.scatter(range(len(KT_list)), KT_list, s = 0.7)
-            #     plt.show()
 
             if np.isnan(self._temperatures).any() or np.isnan(self._flows).any():
                 print(
@@ -1334,9 +1291,6 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
             )  # stockage des débits sous échantillonées pendant la mcmc
             self._acceptance = 0  # taux d'acceptation
 
-            if isinstance(quantile, Number):
-                quantile = [quantile]
-
             for i in trange(nitmaxburning, desc="Init Mcmc ", file=sys.stdout):
                 # on tire un jeu de paramètres aléatoires selon les priors
                 self.sample_params_from_priors()
@@ -1615,7 +1569,6 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
     def get_temperature_at_sensors(
         self, zero=0, verbose=False
     ):  # possibility to translate temperature with zero=ZERO_CELSIUS. as is temperature in Kelvin
-        depths = self.get_depths_solve()
         ids = self.get_id_sensors()
         if verbose:
             print(f"{len(ids)} Sensors\n")
@@ -1625,12 +1578,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
         temperatures[0] = self._T_riv - zero
         temperatures[len(ids) + 1] = self._T_aq - zero
         for id in range(len(ids)):
-            # print(self.get_temperatures_solve()) # mise en commentaire car on ne sait pas à quoi sert ce print
             temperatures[id + 1] = self.get_temperatures_solve()[ids[id]] - zero
-            # print(f"printing extracted temperatures:{id+1}")
-            # print(temperatures[id+1])
-            # for j in range(len(temperatures[id+1])):
-            #    print(f"\tprinting extracted coordinate {id+1},{j}: {temperatures[id+1][j]}\n")
         return temperatures
 
     @compute_solve_transi.needed
@@ -1645,14 +1593,10 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
     ):
         zoomSize = 2
         titleSize = fontsize + zoomSize
-        reducedSize = fontsize - 2 * zoomSize
-        nd = self.get_dt_in_days()
         temps_en_jours = self.create_time_in_day()
         fig, ax = plt.subplots(figsize=(10, 5), facecolor="w")
 
         """Plots des profils de température"""
-        dt_inmin = self.get_dt() / NSECINMIN
-        upperLabel = "n * {0:.1f}min".format(dt_inmin)
 
         im = ax.imshow(
             plotIt,
@@ -1670,10 +1614,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
         ax.set_ylabel("depth in m", fontsize=fontsize)
         ax.xaxis.tick_bottom()
         ax.xaxis.set_label_position("bottom")
-        # ax.secax = ax.secondary_xaxis(
-        #     "top", functions=(jour, jour2dt)
-        # )
-        # ax.secax.set_xlabel(upperLabel, fontsize=reducedSize)
+
         cbar = plt.colorbar(im, ax=ax, shrink=1, location="right")
 
         cbarSize = ax.xaxis.get_ticklabels()[
@@ -1706,10 +1647,8 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
     ):
         zoomSize = 2
         titleSize = fontsize + zoomSize
-        #   reducedSize = fontsize-2 * zoomSize
         fig, ax = plt.subplots(figsize=(10, 5), facecolor="w")
 
-        nd = self.get_dt_in_days()
         temps_en_jours = self.create_time_in_day()
         ids = self.get_id_sensors()
         temperatures = self.get_temperature_at_sensors(verbose=verbose)
@@ -1746,9 +1685,6 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
     @compute_solve_transi.needed
     def plot_compare_temperatures_sensors(self, tunits="K", fontsize=15):
         zeroT = self.set_zeroT(tunits)
-        zoomSize = 2
-        titleSize = fontsize + zoomSize
-        nd = self.get_dt_in_days()
         temps_en_jours = self.create_time_in_day()
         ids = self.get_id_sensors()
         temperatures = self.get_temperature_at_sensors() - zeroT
@@ -1802,9 +1738,6 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
         fig, ax = plt.subplots(figsize=(10, 5), facecolor="w")
         nt = len(self._times)
 
-        # # Generate greyscale colors from 25% grey to black
-        # greyscale_colors = [str(0.25 + 0.75 * i / (nt // dplot)) for i in range(nt // dplot)]
-
         # Create a custom colormap from light orange to dark brown
         colors = [(1, 0.8, 0.6), (0.4, 0.2, 0)]  # Light orange to dark brown
         n_bins = nt // dplot  # Discretize the colormap
@@ -1817,7 +1750,6 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
         line_styles = ["-", "--", "-.", ":", (0, (3, 1, 1, 1)), (0, (5, 10))]
 
         for idx, i in enumerate(range(0, nt, dplot)):
-            # color = greyscale_colors[idx % len(greyscale_colors)]
             color = colors[idx % len(colors)]
             linestyle = line_styles[idx % len(line_styles)]
             ax.plot(
@@ -1840,17 +1772,13 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
         plt.show()
 
     @compute_solve_transi.needed
-    @compute_solve_transi.needed
     def plot_CALC_results(self, fontsize=15):
         print(
             f"Plotting Température in column. time series have nrecords =  {len(self._times)}"
         )
         nt = len(self._times)
-        time_array = self.create_time_in_day()
         K_offset = ZERO_CELSIUS
-        nb_cells = len(self._z_solve)
         n_sens = len(self.depth_sensors) - 1
-        dz = self._real_z[-1] / nb_cells
 
         """Changement de l'échelle de l'axe x"""
 
@@ -2150,7 +2078,6 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
         spname="VirtualPoint",
         psenname="Pvirtual",
         shaftname="Svirtual",
-        tname="Tvirtual",
     ):
         fp.write(f"Point_Name,{spname}\n")
         fp.write(f"P_Sensor_Name,{psenname}\n")

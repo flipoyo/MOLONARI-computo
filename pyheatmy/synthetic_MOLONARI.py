@@ -1,16 +1,13 @@
 from datetime import datetime, timedelta
-from pyheatmy.params import Param, Prior, PARAM_LIST
 from pyheatmy.checker import checker
-from pyheatmy.core import Column
 from pyheatmy.config import *
-from pyheatmy.utils import create_periodic_signal, convert_to_timestamp, convert_list_to_timestamp, create_multi_periodic_signal
+from pyheatmy.utils import create_multi_periodic_signal
 # Adding the multi_periodic_signal function to generate more complex signals
 
 from scipy.interpolate import interp1d  # lagrange
 
 import numpy as np
 from numpy.random import normal
-import matplotlib.pyplot as plt
 import pandas as pd
 
 
@@ -39,10 +36,8 @@ class synthetic_MOLONARI:  # on simule un tableau de mesures
         # On verifie si param_T_riv_signal est une liste ou une liste de liste
         if isinstance(param_T_riv_signal[0], list):
             print("param_T_riv_signal is a list of list, generating multi periodic signal")
-            self._multiperiodic = True
         else:
             print("param_T_riv_signal is a one level list, generating single periodic signal")
-            self._multiperiodic = False
 
         self._force_T_bottom = array_T_bottom
         self._param_dates = param_time_dates
@@ -77,29 +72,6 @@ class synthetic_MOLONARI:  # on simule un tableau de mesures
             self._T_aq = self._force_T_bottom
             self._generate_Shaft_Temp_series(verbose=self.verbose)
             self._generate_perturb_Shaft_Temp_series()
-
-
-        # self._dates = np.array([None])
-        # self._time_array = np.array([None])
-        # # le tableau d'observation des charges utilisable dans colonne
-        # self._dH = np.array([None])
-        # self._dH_perturb = np.array([None])  # avec perturbation
-        # # récupère la liste de température observée de la rivière (au cours du temps)
-        # self._T_riv = np.array([None])
-        # self._T_riv_perturb = np.array([None])  # avec perturbation     
-        # # récupère la liste de température observée de l'aquifère (au cours du temps)
-        # self._T_aq = np.array([None])
-        # self._T_aq_perturb = np.array([None])  # avec perturbation
-        # # le tableau d'observation des températures utilisable dans colonne
-        # self._T_Shaft = np.array([None])
-        # self._T_Shaft_perturb = np.array([None])  # avec perturbation
-
-        # self._T_Shaft_measures = None
-        # self._molonariT_data = None  # avec perturbation
-
-        # # le tableau d'observation de la pression et de la température rivière
-        # self._molonariP_data = None
-        # self._molonariP_data = None
 
 
     @classmethod
@@ -206,58 +178,11 @@ class synthetic_MOLONARI:  # on simule un tableau de mesures
         self._T_Shaft_measures = list(zip(self._dates, self._T_Shaft))
 
 
-    def _plot_molonariT_data(self): 
-        # Assuming self._molonariT_data is already populated
-        # Extract dates and temperature data
-        dates = [data[0] for data in self._molonariT_data]
-        temperatures = np.array([data[1:] for data in self._molonariT_data])  # Extract all temperature series
-
-        # Check if the dimensions match
-        if len(dates) != temperatures.shape[0]:
-            raise ValueError(f"Dates and temperatures must have the same length, but have shapes {len(dates)} and {temperatures.shape[0]}")
-
-        nts=len(temperatures[:,])
-        # Define a list of colors
-        colors = plt.cm.viridis(np.linspace(0, 1, nts))
-
-        # Plot each time series with a different color and label
-        plt.figure(figsize=(10, 6))
-        for i in range(nts):
-            print(i)
-            plt.plot(dates, temperatures[:, i], label=f'Shaft Sensor {i+1}', color=colors[i])
-
-        # Formatting the plot
-        plt.xlabel('Date')
-        plt.ylabel('Temperature')
-        plt.title('Temperature Perturbation Over Time')
-        plt.legend()
-        plt.grid(True)
-        plt.xticks(rotation=45)  # Rotate date labels for better readability
-
-        # Show the plot
-        plt.tight_layout()
-        plt.show()
-
-
     def _measures_column_one_layer(self, column, verbose=False):
         column.compute_solve_transi(verbose=verbose)
         self._set_Shaft_Temp_series(column.get_temperature_at_sensors(verbose=verbose),column.get_id_sensors())        
         self._generate_perturb_Shaft_Temp_series()
 
-# # method not finished, can be erased
-#     @ _generate_perturb_Shaft_Temp_series.needed
-#     def _print_molonariDevice(self, column, type,verbose=True):
-#         if type == "molonariT":
-#             if verbose:
-#                 print("MolonariT data")
-#                 print(self._molonariT_data)
-#             self._plot_molonariT_data()
-#         elif type == "molonariP":
-#             if verbose:
-#                 print("MolonariP data")
-#                 print(self._molonariP_data)
-#         else:
-#             print("Type not recognized")
 
 #Ajout d'une fonction pour convertir une période d'unité donnée en secondes
 

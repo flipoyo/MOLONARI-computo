@@ -3,7 +3,6 @@ from numpy import float32, zeros
 from numpy.linalg import solve
 
 # import numpy as np
-from numba import njit
 import numpy as np
 
 from pyheatmy.solver import solver, tri_product
@@ -808,8 +807,3 @@ class HTK_stratified(Linear_system):
         )
         # c += self.q_s_list[:, j]
         return c
-
-
-if __name__ == "__main__":
-    L = 0.5
-    print(1)

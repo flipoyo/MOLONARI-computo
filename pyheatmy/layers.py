@@ -1,11 +1,4 @@
 import numpy as np
-from copy import deepcopy
-from typing import Sequence, Callable
-from random import uniform, gauss
-from collections import namedtuple
-from dataclasses import dataclass
-from random import uniform, gauss
-from numpy import inf
 from pyheatmy.config import *
 
 from pyheatmy.params import Param, Prior
