@@ -861,7 +861,8 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
             remaining_indices = np.setdiff1d(available_indices, a)
             b = np.random.choice(remaining_indices, delta, replace=False)
             gamma = GAMMA_FACTOR / np.sqrt(2 * d_star * delta)
-            gamma = np.random.choice([gamma, 1], 1, [0.8, 0.2])
+            if np.random.uniform() < DREAM_PROB_MODE_JUMP:
+                gamma = DREAM_GAMMA_MODE_JUMP
 
             # Le calcul de dX ne se fait que sur les indices où A est True.
             dX[l][A] = zeta + (1 + lambd) * gamma * np.sum(
@@ -1037,24 +1038,18 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
             self._states = list()
             X = np.zeros((nb_chain, nb_layer, nb_param), np.float32)
             Energy = np.zeros((nb_chain), np.float32)
+            sigma2_chain = np.zeros(nb_chain, np.float64)  # sigma2 courant de chaque chaîne
 
             for j, column in enumerate(multi_chain):
                 column.sample_params_from_priors()
                 X[j] = column._get_list_mcmc_params()
-                Energy[j] = compute_energy(
-                    _temp_iter_chain[j][ind_ref], temp_ref, sigma2, sigma2_distrib
-                )
+                sigma2_chain[j] = sigma2_temp_prior.sample()
 
                 column.compute_solve_transi(verbose=False)
                 _temp_iter_chain[j] = column.get_temperatures_solve()
                 _flow_iter_chain[j] = column.get_flows_solve()
-                self._states.append(
-                    State(
-                        layers=X[j].copy(), # copy: X[j] is overwritten in place on acceptance
-                        energy=Energy[j],
-                        ratio_accept=1,
-                        sigma2_temp=sigma2_temp_prior.sample(),
-                    )
+                Energy[j] = compute_energy(
+                    _temp_iter_chain[j][ind_ref], temp_ref, sigma2_chain[j], sigma2_distrib
                 )
 
             ### stockage des résultats
@@ -1102,7 +1097,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                         is_param_fixed,
                     )
                     sigma2_temp_proposal = sigma2_temp_prior.perturb(
-                        self._states[j].sigma2_temp
+                        sigma2_chain[j]
                     )  # On tire un nouveau sigma2
 
                     # On met à jour les paramètres de la colonne j selon X_proposal pour appeler le modèle direct et calculer l'énergie:
@@ -1135,11 +1130,12 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                             X_proposal  # actualisation des paramètres pour la chaine j
                         )
                         Energy[j] = Energy_Proposal
+                        sigma2_chain[j] = sigma2_temp_proposal
                         _temp_iter_chain[j] = (
                             temp_proposal  # actualisation du profil de température
                         )
 
-                        _flow_iter_chain[j] = column.get_flows_solve()  # actualisation du débit (B-08)
+                        _flow_iter_chain[j] = column.get_flows_solve()  # actualisation du débit
 
 
                     else:
@@ -1181,6 +1177,17 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
 
             self.nb_burn_in_iter = nb_burn_in_iter
 
+            # L'historique des états commence à la position atteinte en fin de burn-in
+            for j in range(nb_chain):
+                self._states.append(
+                    State(
+                        layers=X[j].copy(),  # copy: X[j] is overwritten in place on acceptance
+                        energy=Energy[j],
+                        ratio_accept=1,
+                        sigma2_temp=sigma2_chain[j],
+                    )
+                )
+
             # On suit les taux d'acceptation pour chaque chaîne grâce à un vecteur de taille nb_chain qu'on incrémente à chaque itération
             self._acceptance = np.zeros(nb_chain, np.float32)
 
@@ -1219,7 +1226,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                         is_param_fixed,
                     )
                     sigma2_temp_proposal = sigma2_temp_prior.perturb(
-                        self._states[j].sigma2_temp
+                        sigma2_chain[j]
                     )  # On tire un nouveau sigma2
 
                     # Mise à jour des paramètres de la colonne j :
@@ -1248,6 +1255,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                         # on met à jour l'état de la colonne
                         X[j] = X_proposal
                         Energy[j] = Energy_Proposal
+                        sigma2_chain[j] = sigma2_temp_proposal
                         self._acceptance[j] += 1
 
                         _temp_iter_chain[j] = temp_proposal

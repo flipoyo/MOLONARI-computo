@@ -88,6 +88,8 @@ MEDIANE = 0.5
 QUANTILE_MAX = 0.95
 N_PARAM_MCMC = 5
 GAMMA_FACTOR = 2.38  # DREAM jump scale: gamma = GAMMA_FACTOR / sqrt(2 * delta * d*)
+DREAM_PROB_MODE_JUMP = 0.2   # DREAM: probability of using gamma = DREAM_GAMMA_MODE_JUMP, to jump between posterior modes
+DREAM_GAMMA_MODE_JUMP = 1.0
 
 
 class DeviceType(Enum):
