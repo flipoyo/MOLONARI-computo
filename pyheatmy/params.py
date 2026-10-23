@@ -1,9 +1,7 @@
 from collections import namedtuple
-from copy import deepcopy
 from dataclasses import dataclass
 from random import uniform, gauss
-from numpy import inf
-from typing import Callable, Sequence
+from typing import Callable
 from pyheatmy.config import *
 from numbers import Number  # Pour vérifier si une variable est un nombre (int, float)
 
@@ -21,7 +19,7 @@ def cst(x):
 @dataclass
 class Prior:
     """
-    Classe Prior autonome qui choisit automatiquement la meilleure échelle (linéaire, log, asinh)
+    Classe Prior autonome qui choisit automatiquement la meilleure échelle (linéaire, log, symlog)
     Et gère les paramètres fixes.
     """
 
@@ -38,7 +36,6 @@ class Prior:
             self.scale = "fixed"
             self.mcmc_range = (float(self.user_range), float(self.user_range))
             # Pas de facteur d'échelle nécessaire pour un paramètre fixe.
-            self.asinh_scale = 1.0
             return
 
         self.is_fixed = False
@@ -173,41 +170,6 @@ class Prior:
                 f"Prior sur l'intervalle physique [{self.user_range[0]:.2e}, {self.user_range[1]:.2e}]"
                 + scale_info
             )
-
-    # --- ANCIENNE VERSION DE LA MÉTHODE PERTURB (pour comparaison) ---
-    # def perturb(self, val):
-    #     # Perturbe la valeur d'un paramètre en respectant le prior.
-    #     new_val = val + gauss(0, self.user_sigma)
-    #     lower_bound, upper_bound = self.range
-    #     range_span = upper_bound - lower_bound
-    #     # Cette gestion des bords ("modulo") pouvait causer des sauts non physiques.
-    #     if range_span != 0:
-    #         new_val = (new_val - lower_bound) % range_span + lower_bound
-    #     else:
-    #         new_val = val
-    #     return new_val
-    # -----------------------------------------------------------------
-
-    def reciprocal(x):
-        return 1 / x
-
-    priors = {
-        "IntrinK": ((11, 15), 0.01),  # (intervalle, user_sigma)
-        "n": ((0.01, 0.25), 0.01),
-        "lambda_s": ((1, 5), 0.1),
-        "rhos_cs": ((1e6, 1e7), 1e5),
-        "q_s": ((0, 1), 1e2),
-    }
-
-    # priors1 = ParamsPriors(
-    #    [Prior(*args) for args in (priors[lbl] for lbl in PARAM_LIST)]
-    # )
-
-    # priors2 = ParamsPriors(
-    #     [Prior(*args) for args in (priors[lbl] for lbl in PARAM_LIST)]
-    # )
-
-    # geom = AllPriors([priors1, priors2])
 
 
 def calc_K(k):
