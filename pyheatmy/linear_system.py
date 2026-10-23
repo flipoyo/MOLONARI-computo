@@ -164,6 +164,7 @@ class H_stratified(Linear_system):
         for tup_idx in range(len(self.inter_cara)):
             self.correct_numerical_schema(
                 tup_idx,
+                dt,
                 lower_diagonal_B,
                 diagonal_B,
                 upper_diagonal_B,
@@ -209,6 +210,7 @@ class H_stratified(Linear_system):
             for tup_idx in range(len(self.inter_cara)):
                 self.correct_numerical_schema(
                     tup_idx,
+                    dt,
                     lower_diagonal_B,
                     diagonal_B,
                     upper_diagonal_B,
@@ -274,6 +276,7 @@ class H_stratified(Linear_system):
     def correct_numerical_schema(
         self,
         tup_idx,
+        dt,
         lower_diagonal_B,
         diagonal_B,
         upper_diagonal_B,
@@ -287,13 +290,13 @@ class H_stratified(Linear_system):
         if self.inter_cara[tup_idx][1] == 0:
             pos_idx = int(self.inter_cara[tup_idx][0])
             diagonal_B[pos_idx] = (
-                self.Ss_list[pos_idx] * 1 / self.all_dt[0]
+                self.Ss_list[pos_idx] * 1 / dt
                 - (K1 + K2) * (1 - self.alpha) / self.dz**2
             )
             lower_diagonal_B[pos_idx - 1] = K1 * (1 - self.alpha) / self.dz**2
             upper_diagonal_B[pos_idx] = K2 * (1 - self.alpha) / self.dz**2
             diagonal_A[pos_idx] = (
-                self.Ss_list[pos_idx] * 1 / self.all_dt[0]
+                self.Ss_list[pos_idx] * 1 / dt
                 + (K1 + K2) * self.alpha / self.dz**2
             )
             lower_diagonal_A[pos_idx - 1] = -K1 * self.alpha / self.dz**2
@@ -305,26 +308,26 @@ class H_stratified(Linear_system):
             )
             Keq = 1 / (x / K1 + (1 - x) / K2)
             diagonal_B[pos_idx] = (
-                self.Ss_list[pos_idx] * 1 / self.all_dt[0]
+                self.Ss_list[pos_idx] * 1 / dt
                 - (K1 + Keq) * (1 - self.alpha) / self.dz**2
             )
             lower_diagonal_B[pos_idx - 1] = K1 * (1 - self.alpha) / self.dz**2
             upper_diagonal_B[pos_idx] = Keq * (1 - self.alpha) / self.dz**2
             diagonal_A[pos_idx] = (
-                self.Ss_list[pos_idx] * 1 / self.all_dt[0]
+                self.Ss_list[pos_idx] * 1 / dt
                 + (K1 + Keq) * self.alpha / self.dz**2
             )
             lower_diagonal_A[pos_idx - 1] = -K1 * self.alpha / self.dz**2
             upper_diagonal_A[pos_idx] = -Keq * self.alpha / self.dz**2
 
             diagonal_B[pos_idx + 1] = (
-                self.Ss_list[pos_idx + 1] * 1 / self.all_dt[0]
+                self.Ss_list[pos_idx + 1] * 1 / dt
                 - (K2 + Keq) * (1 - self.alpha) / self.dz**2
             )
             lower_diagonal_B[pos_idx] = Keq * (1 - self.alpha) / self.dz**2
             upper_diagonal_B[pos_idx + 1] = K2 * (1 - self.alpha) / self.dz**2
             diagonal_A[pos_idx + 1] = (
-                self.Ss_list[pos_idx + 1] * 1 / self.all_dt[0]
+                self.Ss_list[pos_idx + 1] * 1 / dt
                 + (K2 + Keq) * self.alpha / self.dz**2
             )
             lower_diagonal_A[pos_idx] = -Keq * self.alpha / self.dz**2
