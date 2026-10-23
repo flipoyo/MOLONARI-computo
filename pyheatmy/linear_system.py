@@ -318,13 +318,13 @@ class H_stratified(Linear_system):
             upper_diagonal_A[pos_idx] = -Keq * self.alpha / self.dz**2
 
             diagonal_B[pos_idx + 1] = (
-                self.Ss_list[pos_idx] * 1 / self.all_dt[0]
+                self.Ss_list[pos_idx + 1] * 1 / self.all_dt[0]
                 - (K2 + Keq) * (1 - self.alpha) / self.dz**2
             )
             lower_diagonal_B[pos_idx] = Keq * (1 - self.alpha) / self.dz**2
             upper_diagonal_B[pos_idx + 1] = K2 * (1 - self.alpha) / self.dz**2
             diagonal_A[pos_idx + 1] = (
-                self.Ss_list[pos_idx] * 1 / self.all_dt[0]
+                self.Ss_list[pos_idx + 1] * 1 / self.all_dt[0]
                 + (K2 + Keq) * self.alpha / self.dz**2
             )
             lower_diagonal_A[pos_idx] = -Keq * self.alpha / self.dz**2
