@@ -9,6 +9,9 @@ from pyheatmy import config, params
 from pyheatmy.params import Prior
 
 USER_SIGMA = 0.5  # does not affect the scale choice
+# Physical values go down to 1e-17, below the default absolute tolerance of pytest.approx (1e-12),
+# so comparisons of physical values use a relative tolerance only (abs=0).
+RELATIVE_TOLERANCE = 1e-9
 
 # Typical ranges
 INTRINK_RANGE = (1e-18, 1e-15)      # permeability in m2: three orders of magnitude
@@ -103,7 +106,7 @@ def test_mcmc_to_physical_inverts_physical_to_mcmc(user_range, physical_value):
     """Going to the MCMC space and back gives the physical value again, on every scale."""
     prior = Prior(user_range, USER_SIGMA)
     round_trip = prior.mcmc_to_physical(prior.physical_to_mcmc(physical_value))
-    assert round_trip == pytest.approx(physical_value)
+    assert round_trip == pytest.approx(physical_value, rel=RELATIVE_TOLERANCE, abs=0)
 
 
 def test_log_scale_works_with_decimal_exponents():
@@ -117,7 +120,8 @@ def test_symlog_linear_threshold_is_largest_bound_over_ratio():
     """The linear zone of symlog is set by the largest bound, as the code comment documents."""
     prior = Prior(Q_S_RANGE, USER_SIGMA)
     largest_bound = max(abs(bound) for bound in Q_S_RANGE)
-    assert prior.linthresh == pytest.approx(largest_bound / config.SYMLOG_LINTHRESH_RATIO)
+    assert prior.linthresh == pytest.approx(largest_bound / config.SYMLOG_LINTHRESH_RATIO,
+                                            rel=RELATIVE_TOLERANCE, abs=0)
 
 
 def test_symlog_is_continuous_at_linear_threshold():
@@ -130,8 +134,8 @@ def test_symlog_is_continuous_at_linear_threshold():
 
     back_below = prior.mcmc_to_physical(MCMC_VALUE_AT_LINTHRESH * TIGHT_JUST_BELOW)
     back_above = prior.mcmc_to_physical(MCMC_VALUE_AT_LINTHRESH * TIGHT_JUST_ABOVE)
-    assert back_below == pytest.approx(prior.linthresh)
-    assert back_above == pytest.approx(prior.linthresh)
+    assert back_below == pytest.approx(prior.linthresh, rel=CONTINUITY_TOLERANCE, abs=0)
+    assert back_above == pytest.approx(prior.linthresh, rel=CONTINUITY_TOLERANCE, abs=0)
 
 
 @pytest.mark.parametrize("user_range", [
