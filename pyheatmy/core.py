@@ -2,8 +2,8 @@ from typing import List, Sequence, Union
 from random import random, choice
 from operator import attrgetter
 from numbers import Number
-from datetime import datetime
 import sys
+import warnings
 import psutil
 import types
 
@@ -38,10 +38,9 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
         T_measures: list,  # liste contenant un tuple avec la date et la température aux points de mesure de longueur le nombre de temps mesuré
         sigma_meas_P: float = None,  # écart type de l'incertitude sur les valeurs de pression capteur
         sigma_meas_T: float = None,  # écart type de l'incertitude sur les valeurs de température capteur
-        all_layers: list[Layer] = [],  # liste des couches de la colonne
+        all_layers: list[Layer] = None,  # liste des couches de la colonne (ou plus tard avec set_layers)
         inter_mode: str = "linear",  # mode d'interpolation du profil de température initial : 'lagrange' ou 'linear'
         eps=EPSILON,
-        q_s_list=np.ndarray,  # liste des débits spécifiques (.s-1) source pour chaque couche
         nb_cells=NB_CELLS,
         rac="~/OUTPUT_MOLONARI1D/generated_data",  # printing directory by default,
         verbose=False,
@@ -74,6 +73,8 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
         self.zbed = river_bed  # profondeur du lit de la rivière
 
         self.all_layers = []  # liste des couches de la colonne
+        if all_layers:  # layers can be given here or later with set_layers (B-20)
+            self.set_layers(all_layers)
 
         self._z_solve = (
             None  # le tableau contenant la profondeur du milieu des cellules
@@ -91,7 +92,6 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
 
         # liste contenant des objets de classe état et de longueur le nombre d'états acceptés par la MCMC (<=nb_iter), passe à un moment par une longueur de 1000 pendant l'initialisation de MCMC
         self._states = list()
-        self._acceptances = None
         # dictionnaire indexé par les quantiles (0.05,0.5,0.95) à qui on a associe un array de deux dimensions : dimension 1 les profondeurs, dimension 2 : liste des valeurs de températures associées au quantile, de longueur les temps de mesure
         self._quantiles_temperatures = None
         # dictionnaire indexé par les quantiles (0.05,0.5,0.95) à qui on a associe un array de deux dimensions : dimension 1 les profondeurs, dimension 2 : liste des valeurs de débits spécifiques associés au quantile, de longueur les temps de mesure
@@ -134,15 +134,27 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
             self.all_layers, key=lambda x: x.zLow
         )  # we're sorting the layerlist by increasing zLow
 
+    def _check_layers_geometry(self):
+        # the layers must fill the column from the river bed down to its bottom, the deepest sensor (B-19)
+        if not self.all_layers:
+            raise ValueError("No layer in the column: call set_layers before computing.")
+        bottom = self._real_z[-1]
+        for layer in self.all_layers[:-1]:
+            if not self._real_z[0] < layer.zLow < bottom - EPSILON:
+                raise ValueError(
+                    f"The boundary below layer '{layer.name}' (zLow = {layer.zLow} m) is outside the column, "
+                    f"whose bottom (deepest sensor, offset included) is at {bottom} m."
+                )
+        last = self.all_layers[-1]
+        if last.zLow < bottom - EPSILON:
+            warnings.warn(
+                f"The last layer '{last.name}' ends at zLow = {last.zLow} m, above the column bottom ({bottom} m): "
+                f"it is extended down to the bottom.",
+                UserWarning,
+            )
+
     def initialization(self, nb_cells):
         self._nb_cells = nb_cells
-        self.initialize_q_s_list()
-
-    def initialization_nb_cells(self, nb_cells):
-        self._nb_cells = nb_cells
-
-    def initialize_q_s_list(self):
-        self._q_s_list = np.zeros((self._nb_cells, len(self._times)))
 
     def tests(self):
         # teste que les données sont aux bons formats
@@ -179,11 +191,9 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
         return len(self._times)
 
     def get_dt(self):
-        nt = self.get_timelength()
-        # print(f"number of time steps =  {nt}")
-        dt = (self._times[-1] - self._times[0]).total_seconds()
-        dt /= nt
-        # print(f"time step in seconds =  {dt}")
+        # mean time step = mean of the actual intervals between successive measurements
+        steps = np.diff(self._times)
+        dt = np.mean([step.total_seconds() for step in steps])
         return dt
 
     def get_dt_in_days(self):
@@ -202,6 +212,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
 
     @checker
     def compute_solve_transi(self, verbose=True):
+        self._check_layers_geometry()
         layersList = self.all_layers
         nb_cells = self._nb_cells
 
@@ -216,14 +227,6 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
             self._id_sensors = [
                 np.argmin(np.abs(z - self._z_solve)) for z in self._real_z[1:-1]
             ]
-
-            all_dt = np.array(
-                [
-                    (self._times[j + 1] - self._times[j]).total_seconds()
-                    for j in range(len(self._times) - 1)
-                ]
-            )  # le tableau des pas de temps (dépend des données d'entrée)
-            isdtconstant = np.all(all_dt == all_dt[0])
 
             all_dt = np.array(
                 [
@@ -262,14 +265,13 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
             ## pour le cas uni-couche, on le simule dans H_stratified avec deux couches de mêmes paramètres
             array_IntrinK = np.array([IntrinK, IntrinK])
             # array_K = 10 ** (-array_IntrinK * 1.0)
-            array_K = (RHO_W * G * 10.0**-array_IntrinK) * 1.0 / MU
-            array_q_s = np.array([q_s, q_s])
+            array_K = (RHO_W * G * 10.0**-array_IntrinK) * 1.0 / MU_W
             array_Ss = np.array([Ss, Ss])
             list_zLow = np.array([0.2])
             inter_cara = np.array([[nb_cells // 2, 0]])
             z_solve = self._z_solve.copy()
             IntrinK_list, n_list, lambda_s_list, rhos_cs_list, q_s_list = (
-                getListParameters(layersList, nb_cells)
+                getListParameters(layersList, self._z_solve)
             )
             Ss_list = n_list / heigth
 
@@ -375,7 +377,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
             T_aq = self._T_aq
 
             IntrinK_list, n_list, lambda_s_list, rhos_cs_list, q_s_list = (
-                getListParameters(layersList, nb_cells)
+                getListParameters(layersList, self._z_solve)
             )
 
             array_IntrinK = np.array(
@@ -391,11 +393,10 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                 np.array([float(x.get_physical_params().n) for x in layersList])
                 / heigth
             )
-            array_eps = np.zeros(len(layersList))  # eps de chaque couche
-            array_eps[0] = layersList[0].zLow
+            # thickness of each layer inside the column; the last layer ends at the column bottom (B-19)
+            z_bounds = [layer.zLow for layer in layersList[:-1]] + [self._real_z[-1]]
+            array_eps = np.diff(z_bounds, prepend=self._real_z[0])
 
-            for idx in range(1, len(layersList)):
-                array_eps[idx] = layersList[idx].zLow - layersList[idx - 1].zLow
             array_Hinter = np.zeros(
                 len(layersList) + 1
             )  # charge hydraulique de chaque interface
@@ -461,16 +462,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                         / array_eps[idx]
                         * (list_array_L[idx] - 0)
                     )
-            # if verbose:
-            #     print("charge hydraulique sur chaque interface", array_Hinter)
-            #     for idx in range(len(list_array_L)):
-            #         plt.plot(list_array_H[idx], list_array_L[idx], label = 'couche ' + str(idx + 1))
-            #     plt.plot(H_init, self._z_solve, linestyle = '--', label = 'solution originale')
-            #     plt.legend()
-            #     plt.title("charge hydraulique stratifiée initialisé")
-            #     plt.xlabel('la charge hydraulique (m)')
-            #     plt.ylabel('le profondeur (m)')
-            #     plt.show()
+    
             H_init = list_array_H[0]
             for idx in range(1, len(list_array_H)):
                 H_init = np.concatenate((H_init, list_array_H[idx]))
@@ -559,10 +551,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
             # ###
 
             # création d'un tableau du gradient de la charge selon la profondeur, calculé à tout temps
-            # conversion of intrinsec permeability to permeability missing
-            # K_list = RHO_W * G * k_list * 1.0 / MU
             K_list = calc_K(IntrinK_list)
-            # print(f"calculating flow in multilayer with permeability {K_list}")
 
             nablaH = H_strat.nablaH()
 
@@ -570,8 +559,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
 
             for i in range(nb_cells):
                 flows[i, :] = -K_list[i] * nablaH[i, :]
-            # if verbose:
-            #     plt.plot(z_solve, flows[:,0], linestyle = '--', label = "avant réparation de dérivation")
+
             for elem_idx in range(len(inter_cara)):
                 if inter_cara[elem_idx][1] == 0:
                     if (
@@ -621,14 +609,6 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                         * nablaH[int(inter_cara[elem_idx][1]), :]
                     )
 
-            # if verbose:
-            #     plt.plot(z_solve, flows[:,0], label = "après réparation de dérivation")
-            #     plt.legend()
-            #     plt.title("flux")
-            #     plt.xlabel("le profondeur (m)")
-            #     plt.ylabel("débit (m/s)")
-            #     plt.show()
-
             ## zhan Nov8
             T_strat = T_stratified(
                 nablaH,
@@ -655,9 +635,6 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
             self._flows = flows  # calcul du débit spécifique
             if verbose:
                 print("Done.")
-            # if verbose:
-            #     plt.scatter(range(len(KT_list)), KT_list, s = 0.7)
-            #     plt.show()
 
             if np.isnan(self._temperatures).any() or np.isnan(self._flows).any():
                 print(
@@ -785,7 +762,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
         dz = self._z_solve[1] - self._z_solve[0]  # pas en profondeur
         nb_cells = len(self._z_solve)
 
-        _, n_list, lambda_s_list, _, _ = getListParameters(self.all_layers, nb_cells)
+        _, n_list, lambda_s_list, _, _ = getListParameters(self.all_layers, self._z_solve)
 
         lambda_m_list = (
             n_list * (LAMBDA_W) ** 0.5 + (1.0 - n_list) * (lambda_s_list) ** 0.5
@@ -883,8 +860,9 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
             a = np.random.choice(available_indices, delta, replace=False)
             remaining_indices = np.setdiff1d(available_indices, a)
             b = np.random.choice(remaining_indices, delta, replace=False)
-            gamma = 2.38 / np.sqrt(2 * d_star * delta)
-            gamma = np.random.choice([gamma, 1], 1, [0.8, 0.2])
+            gamma = GAMMA_FACTOR / np.sqrt(2 * d_star * delta)
+            if np.random.uniform() < DREAM_PROB_MODE_JUMP:
+                gamma = DREAM_GAMMA_MODE_JUMP
 
             # Le calcul de dX ne se fait que sur les indices où A est True.
             dX[l][A] = zeta + (1 + lambd) * gamma * np.sum(
@@ -1060,24 +1038,18 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
             self._states = list()
             X = np.zeros((nb_chain, nb_layer, nb_param), np.float32)
             Energy = np.zeros((nb_chain), np.float32)
+            sigma2_chain = np.zeros(nb_chain, np.float64)  # sigma2 courant de chaque chaîne
 
             for j, column in enumerate(multi_chain):
                 column.sample_params_from_priors()
                 X[j] = column._get_list_mcmc_params()
-                Energy[j] = compute_energy(
-                    _temp_iter_chain[j][ind_ref], temp_ref, sigma2, sigma2_distrib
-                )
+                sigma2_chain[j] = sigma2_temp_prior.sample()
 
                 column.compute_solve_transi(verbose=False)
                 _temp_iter_chain[j] = column.get_temperatures_solve()
                 _flow_iter_chain[j] = column.get_flows_solve()
-                self._states.append(
-                    State(
-                        layers=X[j],
-                        energy=Energy[j],
-                        ratio_accept=1,
-                        sigma2_temp=sigma2_temp_prior.sample(),
-                    )
+                Energy[j] = compute_energy(
+                    _temp_iter_chain[j][ind_ref], temp_ref, sigma2_chain[j], sigma2_distrib
                 )
 
             ### stockage des résultats
@@ -1125,7 +1097,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                         is_param_fixed,
                     )
                     sigma2_temp_proposal = sigma2_temp_prior.perturb(
-                        self._states[j].sigma2_temp
+                        sigma2_chain[j]
                     )  # On tire un nouveau sigma2
 
                     # On met à jour les paramètres de la colonne j selon X_proposal pour appeler le modèle direct et calculer l'énergie:
@@ -1158,9 +1130,13 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                             X_proposal  # actualisation des paramètres pour la chaine j
                         )
                         Energy[j] = Energy_Proposal
+                        sigma2_chain[j] = sigma2_temp_proposal
                         _temp_iter_chain[j] = (
                             temp_proposal  # actualisation du profil de température
                         )
+
+                        _flow_iter_chain[j] = column.get_flows_solve()  # actualisation du débit
+
 
                     else:
                         dX = np.zeros((nb_layer, nb_param))
@@ -1201,6 +1177,17 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
 
             self.nb_burn_in_iter = nb_burn_in_iter
 
+            # L'historique des états commence à la position atteinte en fin de burn-in
+            for j in range(nb_chain):
+                self._states.append(
+                    State(
+                        layers=X[j].copy(),  # copy: X[j] is overwritten in place on acceptance
+                        energy=Energy[j],
+                        ratio_accept=1,
+                        sigma2_temp=sigma2_chain[j],
+                    )
+                )
+
             # On suit les taux d'acceptation pour chaque chaîne grâce à un vecteur de taille nb_chain qu'on incrémente à chaque itération
             self._acceptance = np.zeros(nb_chain, np.float32)
 
@@ -1239,7 +1226,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                         is_param_fixed,
                     )
                     sigma2_temp_proposal = sigma2_temp_prior.perturb(
-                        self._states[j].sigma2_temp
+                        sigma2_chain[j]
                     )  # On tire un nouveau sigma2
 
                     # Mise à jour des paramètres de la colonne j :
@@ -1251,8 +1238,6 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                     temp_proposal = (
                         column.get_temperatures_solve()
                     )  # récupération du profil de température
-                    _temp_iter_chain[j] = temp_proposal
-                    _flow_iter_chain[j] = column.get_flows_solve()
 
                     Energy_Proposal = compute_energy(
                         temp_proposal[ind_ref],
@@ -1270,11 +1255,15 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                         # on met à jour l'état de la colonne
                         X[j] = X_proposal
                         Energy[j] = Energy_Proposal
+                        sigma2_chain[j] = sigma2_temp_proposal
                         self._acceptance[j] += 1
+
+                        _temp_iter_chain[j] = temp_proposal
+                        _flow_iter_chain[j] = column.get_flows_solve()
 
                         self._states.append(
                             State(
-                                layers=X[j],
+                                layers=X[j].copy(), # copy: X[j] is overwritten in place on acceptance
                                 energy=Energy[j],
                                 ratio_accept=1,
                                 sigma2_temp=sigma2_temp_proposal,
@@ -1334,10 +1323,6 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
             _flows = np.zeros(
                 (sizesubsampling, self._nb_cells, len(self._times)), np.float32
             )  # stockage des débits sous échantillonées pendant la mcmc
-            self._acceptance = 0  # taux d'acceptation
-
-            if isinstance(quantile, Number):
-                quantile = [quantile]
 
             for i in trange(nitmaxburning, desc="Init Mcmc ", file=sys.stdout):
                 # on tire un jeu de paramètres aléatoires selon les priors
@@ -1348,7 +1333,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                 self.compute_solve_transi(verbose=False)
                 self._states.append(
                     State(
-                        layers=self.get_list_current_params(),
+                        layers=self._get_list_mcmc_params(),
                         energy=compute_energy(
                             self.temperatures_solve[ind_ref, :],
                             temp_ref,
@@ -1367,7 +1352,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
             for l, layer in enumerate(self.all_layers):
                 layer.mcmc_params = Param(*self._states[0].layers[l])
 
-            self._acceptance = np.zeros(nb_iter)
+            self.compute_solve_transi(verbose=False)
 
             _temp_iter = self.get_temperatures_solve()
             _flow_iter = self.get_flows_solve()
@@ -1386,8 +1371,6 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
 
                 # on calcule l'énergie pour les nouveaux paramètres
                 self.compute_solve_transi(verbose=False)
-                _temp_iter = self.get_temperatures_solve()
-                _flow_iter = self.get_flows_solve()
 
                 Energy_Proposal = compute_energy(
                     self.temperatures_solve[ind_ref, :],
@@ -1402,9 +1385,13 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
 
                 if np.log(random()) < log_ratio_accept:
                     nb_accepted += 1
+
+                    _temp_iter = self.get_temperatures_solve()
+                    _flow_iter = self.get_flows_solve()
+
                     self._states.append(
                         State(
-                            layers=self.get_list_current_params(),
+                            layers=self._get_list_mcmc_params(),
                             energy=Energy_Proposal,
                             ratio_accept=nb_accepted / (i + 1),
                             sigma2_temp=sigma2_temp_proposal,
@@ -1424,7 +1411,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                     _temp[k] = _temp_iter[::n_sous_ech_space, ::n_sous_ech_time]
                     _flows[k] = _flow_iter[::n_sous_ech_space, ::n_sous_ech_time]
 
-            self._acceptance = nb_accepted / (nb_iter + 1)
+            self._acceptance = nb_accepted / nb_iter
 
             if verbose == True:
                 print(f"Acceptance rate : {self._acceptance}")
@@ -1441,8 +1428,6 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
             quant: res
             for quant, res in zip(quantile, np.quantile(_flows, quantile, axis=0))
         }
-
-        self._acceptance = self._acceptance / nb_iter
 
         if verbose == True:
             print("Quantiles computed")
@@ -1465,18 +1450,14 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
     @compute_mcmc.needed
     def sample_param(self):
         # retourne aléatoirement un des couples de paramètres parlesquels est passé la MCMC
-        return choice(
-            [[layer.mcmc_params for layer in state.layers] for state in self._states]
-        )
+        return choice(self.get_all_params())
 
     # erreur si pas déjà éxécuté compute_mcmc, sinon l'attribut pas encore affecté à une valeur
     @compute_mcmc.needed
     def get_best_param(self):
         """return the params that minimize the energy"""
-        return [
-            layer.mcmc_params
-            for layer in min(self._states, key=attrgetter("energy")).layers
-        ]  # retourne le couple de paramètres minimisant l'énergie par lequels est passé la MCMC
+        i_best = min(range(len(self._states)), key=lambda i: self._states[i].energy)
+        return self.get_all_params()[i_best] # retourne le couple de paramètres minimisant l'énergie par lequels est passé la MCMC
 
     @compute_mcmc.needed
     def get_best_sigma2(self):
@@ -1559,7 +1540,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
 
     @compute_mcmc.needed
     def get_all_energy(self):
-        return self._initial_energies + [state.energy for state in self._states]
+        return [state.energy for state in self._states]
 
     all_energy = property(get_all_energy)
 
@@ -1621,7 +1602,6 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
     def get_temperature_at_sensors(
         self, zero=0, verbose=False
     ):  # possibility to translate temperature with zero=ZERO_CELSIUS. as is temperature in Kelvin
-        depths = self.get_depths_solve()
         ids = self.get_id_sensors()
         if verbose:
             print(f"{len(ids)} Sensors\n")
@@ -1631,12 +1611,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
         temperatures[0] = self._T_riv - zero
         temperatures[len(ids) + 1] = self._T_aq - zero
         for id in range(len(ids)):
-            # print(self.get_temperatures_solve()) # mise en commentaire car on ne sait pas à quoi sert ce print
             temperatures[id + 1] = self.get_temperatures_solve()[ids[id]] - zero
-            # print(f"printing extracted temperatures:{id+1}")
-            # print(temperatures[id+1])
-            # for j in range(len(temperatures[id+1])):
-            #    print(f"\tprinting extracted coordinate {id+1},{j}: {temperatures[id+1][j]}\n")
         return temperatures
 
     @compute_solve_transi.needed
@@ -1651,14 +1626,10 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
     ):
         zoomSize = 2
         titleSize = fontsize + zoomSize
-        reducedSize = fontsize - 2 * zoomSize
-        nd = self.get_dt_in_days()
         temps_en_jours = self.create_time_in_day()
         fig, ax = plt.subplots(figsize=(10, 5), facecolor="w")
 
         """Plots des profils de température"""
-        dt_inmin = self.get_dt() / NSECINMIN
-        upperLabel = "n * {0:.1f}min".format(dt_inmin)
 
         im = ax.imshow(
             plotIt,
@@ -1676,10 +1647,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
         ax.set_ylabel("depth in m", fontsize=fontsize)
         ax.xaxis.tick_bottom()
         ax.xaxis.set_label_position("bottom")
-        # ax.secax = ax.secondary_xaxis(
-        #     "top", functions=(jour, jour2dt)
-        # )
-        # ax.secax.set_xlabel(upperLabel, fontsize=reducedSize)
+
         cbar = plt.colorbar(im, ax=ax, shrink=1, location="right")
 
         cbarSize = ax.xaxis.get_ticklabels()[
@@ -1712,10 +1680,8 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
     ):
         zoomSize = 2
         titleSize = fontsize + zoomSize
-        #   reducedSize = fontsize-2 * zoomSize
         fig, ax = plt.subplots(figsize=(10, 5), facecolor="w")
 
-        nd = self.get_dt_in_days()
         temps_en_jours = self.create_time_in_day()
         ids = self.get_id_sensors()
         temperatures = self.get_temperature_at_sensors(verbose=verbose)
@@ -1752,9 +1718,6 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
     @compute_solve_transi.needed
     def plot_compare_temperatures_sensors(self, tunits="K", fontsize=15):
         zeroT = self.set_zeroT(tunits)
-        zoomSize = 2
-        titleSize = fontsize + zoomSize
-        nd = self.get_dt_in_days()
         temps_en_jours = self.create_time_in_day()
         ids = self.get_id_sensors()
         temperatures = self.get_temperature_at_sensors() - zeroT
@@ -1808,9 +1771,6 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
         fig, ax = plt.subplots(figsize=(10, 5), facecolor="w")
         nt = len(self._times)
 
-        # # Generate greyscale colors from 25% grey to black
-        # greyscale_colors = [str(0.25 + 0.75 * i / (nt // dplot)) for i in range(nt // dplot)]
-
         # Create a custom colormap from light orange to dark brown
         colors = [(1, 0.8, 0.6), (0.4, 0.2, 0)]  # Light orange to dark brown
         n_bins = nt // dplot  # Discretize the colormap
@@ -1823,7 +1783,6 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
         line_styles = ["-", "--", "-.", ":", (0, (3, 1, 1, 1)), (0, (5, 10))]
 
         for idx, i in enumerate(range(0, nt, dplot)):
-            # color = greyscale_colors[idx % len(greyscale_colors)]
             color = colors[idx % len(colors)]
             linestyle = line_styles[idx % len(line_styles)]
             ax.plot(
@@ -1846,17 +1805,13 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
         plt.show()
 
     @compute_solve_transi.needed
-    @compute_solve_transi.needed
     def plot_CALC_results(self, fontsize=15):
         print(
             f"Plotting Température in column. time series have nrecords =  {len(self._times)}"
         )
         nt = len(self._times)
-        time_array = self.create_time_in_day()
         K_offset = ZERO_CELSIUS
-        nb_cells = len(self._z_solve)
         n_sens = len(self.depth_sensors) - 1
-        dz = self._real_z[-1] / nb_cells
 
         """Changement de l'échelle de l'axe x"""
 
@@ -2156,7 +2111,6 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
         spname="VirtualPoint",
         psenname="Pvirtual",
         shaftname="Svirtual",
-        tname="Tvirtual",
     ):
         fp.write(f"Point_Name,{spname}\n")
         fp.write(f"P_Sensor_Name,{psenname}\n")
@@ -2226,16 +2180,9 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
             close_printable_file(fp)
 
     def sample_params_from_priors(self):
-        # Function updating the parameters of the different layers of the column with the sampled values from the priors
-
+        # each layer samples its own parameters from its priors (Layer.sample)
         for layer in self.all_layers:
-            layer.mcmc_params = Param(
-                layer.Prior_IntrinK.sample(),
-                layer.Prior_n.sample(),
-                layer.Prior_lambda_s.sample(),
-                layer.Prior_rhos_cs.sample(),
-                layer.Prior_q_s.sample(),
-            )
+            layer.sample()
 
     def _get_list_mcmc_params(self):
         """
@@ -2252,18 +2199,9 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
         return [layer.get_physical_params() for layer in self.all_layers]
 
     def perturb_params(self):
-        # Function that updates the parameters of the different layers of the column with perturbated with restpect to the priors
-
+        # each layer perturbs its own parameters within its priors (Layer.perturb)
         for layer in self.all_layers:
-            layer.mcmc_params = Param(
-                layer.Prior_IntrinK.perturb(
-                    layer.mcmc_params.IntrinK
-                ),  # on perturbe la valeur précédente du paramètre IntrinK selon l'écart type donné dans le prior
-                layer.Prior_n.perturb(layer.mcmc_params.n),
-                layer.Prior_lambda_s.perturb(layer.mcmc_params.lambda_s),
-                layer.Prior_rhos_cs.perturb(layer.mcmc_params.rhos_cs),
-                layer.Prior_q_s.perturb(layer.mcmc_params.q_s),
-            )
+            layer.perturb()
 
 
 def compute_energy(temp_simul, temp_ref, sigma2, sigma2_distrib):

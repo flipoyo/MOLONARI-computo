@@ -1,11 +1,4 @@
 import numpy as np
-from copy import deepcopy
-from typing import Sequence, Callable
-from random import uniform, gauss
-from collections import namedtuple
-from dataclasses import dataclass
-from random import uniform, gauss
-from numpy import inf
 from pyheatmy.config import *
 
 from pyheatmy.params import Param, Prior
@@ -57,7 +50,7 @@ class Layer:
         sampled_vals = [prior.sample() for prior in self.Prior_list]
         self.mcmc_params = Param(*sampled_vals)
     
-    def perturb(self, param):
+    def perturb(self):
         """Met à jour mcmc_params en appliquant une perturbation à chaque valeur."""
         perturbed_vals = [
             prior.perturb(val)
@@ -107,32 +100,24 @@ class Layer:
         return Param(*physical_vals)
 
 
-def getListParameters(layersList, nbCells: int):
+def getListParameters(layersList, z_cells):
     """
-    Renvoie les profils des paramètres physiques dans la colonne discrétisée, avec les valeurs Physiques
+    Renvoie les profils des paramètres physiques sur les cellules de la colonne.
+    z_cells : profondeurs des centres des cellules (Column._z_solve), mesurées depuis le lit de la rivière.
+    Une cellule appartient à la couche telle que zLow_prev < z <= zLow ; la dernière couche
+    couvre toutes les cellules restantes (prolongée ou coupée au fond de la colonne).
     """
-    dz = layersList[-1].zLow / nbCells
-    cell_centers = np.linspace(dz / 2, layersList[-1].zLow - dz / 2, nbCells)
-    listParameters = np.zeros((nbCells, 5))
+    listParameters = np.zeros((len(z_cells), len(Param._fields)))
     zLow_prev = 0
-    for layer in layersList:
-        # On demande à la couche ses paramètres en format PHYSIQUE.
-        physical_params = layer.get_physical_params()
-        
-        mask = (cell_centers > zLow_prev) & (cell_centers <= layer.zLow)
-        # On assigne directement le tuple de valeurs physiques.
-        # La première colonne sera IntrinK, la dernière sera q_s.
-        listParameters[mask, :] = physical_params
-        
+    for i, layer in enumerate(layersList):
+        if i == len(layersList) - 1:
+            mask = z_cells > zLow_prev
+        else:
+            mask = (z_cells > zLow_prev) & (z_cells <= layer.zLow)
+        listParameters[mask, :] = layer.get_physical_params()
         zLow_prev = layer.zLow
-        
-    return (
-        listParameters[:, 0], # IntrinK
-        listParameters[:, 1], # n
-        listParameters[:, 2], # lambda_s
-        listParameters[:, 3], # rhos_cs
-        listParameters[:, 4], # q_s
-    )
+    return tuple(listParameters[:, i] for i in range(len(Param._fields)))
+
 
 # Add-on function to create the list of layers.
 def layersListCreator(layers_spec):
