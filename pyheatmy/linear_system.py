@@ -7,6 +7,7 @@ import numpy as np
 
 from pyheatmy.solver import solver, tri_product
 from pyheatmy.config import *
+from pyheatmy.params import calc_K
 
 
 # Première classe qui définit et initie les paramètres physiques communs des systèmes linéaires de la classe H_stratified et T_stratified
@@ -43,7 +44,7 @@ class Linear_system:
 
     # @njit
     def compute_K(self, IntrinK_list):
-        return (RHO_W * G * IntrinK_list) * 1.0 / self.mu_list
+        return calc_K(IntrinK_list, self.mu_list)
 
     def compute_n_cell(self):
         return len(self.H_init)

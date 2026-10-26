@@ -264,8 +264,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
 
             ## pour le cas uni-couche, on le simule dans H_stratified avec deux couches de mêmes paramètres
             array_IntrinK = np.array([IntrinK, IntrinK])
-            # array_K = 10 ** (-array_IntrinK * 1.0)
-            array_K = (RHO_W * G * 10.0**-array_IntrinK) * 1.0 / MU_W
+            array_K = calc_K(array_IntrinK)
             array_Ss = np.array([Ss, Ss])
             list_zLow = np.array([0.2])
             inter_cara = np.array([[nb_cells // 2, 0]])
@@ -386,8 +385,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                     for layer in self.all_layers
                 ]
             )
-            array_k = 10 ** (-array_IntrinK)
-            array_K = calc_K(array_k)
+            array_K = calc_K(array_IntrinK)
             heigth = abs(self._real_z[-1] - self._real_z[0])
             array_Ss = (
                 np.array([float(x.get_physical_params().n) for x in layersList])
