@@ -63,6 +63,8 @@ class Layer:
     
     def set_priors_from_dict(self, priors_dict):
         """Assigne les priors depuis un dictionnaire."""
+        # Les valeurs physiques se lisent avec les priors actuels, avant de les remplacer.
+        physical_params = self.get_physical_params()
         self.Prior_IntrinK = Prior(*priors_dict['Prior_IntrinK'])
         self.Prior_n = Prior(*priors_dict['Prior_n'])
         self.Prior_lambda_s = Prior(*priors_dict['Prior_lambda_s'])
@@ -71,7 +73,6 @@ class Layer:
         self.Prior_list = [self.Prior_IntrinK, self.Prior_n, self.Prior_lambda_s, self.Prior_rhos_cs, self.Prior_q_s]
         
         # Il faut aussi mettre à jour les mcmc_params lorsque les priors sont assignés !
-        physical_params = self.get_physical_params()
         mcmc_vals = [
             prior.physical_to_mcmc(val) if prior is not None else val
             for prior, val in zip(self.Prior_list, physical_params)
