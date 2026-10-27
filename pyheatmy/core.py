@@ -918,7 +918,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
             )
 
         n_sous_ech_iter = max(1, int(np.floor(nb_chain * nb_iter / NSAMPLEMIN)))
-        sizesubsampling = max(int(np.floor(nb_iter / n_sous_ech_iter)), 1)
+        sizesubsampling = max(int(np.ceil(nb_iter / n_sous_ech_iter)), 1)
 
         if verbose:
             print(
@@ -1405,7 +1405,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                         layer.mcmc_params = Param(*X[l])
 
                 if i % n_sous_ech_iter == 0:
-                    # Si i+1 est un multiple de n_sous_ech_iter, on stocke
+                    # Si i est un multiple de n_sous_ech_iter, on stocke
                     k = i // n_sous_ech_iter
                     _temp[k] = _temp_iter[::n_sous_ech_space, ::n_sous_ech_time]
                     _flows[k] = _flow_iter[::n_sous_ech_space, ::n_sous_ech_time]
