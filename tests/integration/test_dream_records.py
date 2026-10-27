@@ -96,8 +96,6 @@ def test_dream_sigma2_proposals_start_from_current_state(run_demo_mcmc, monkeypa
     assert main_loop_inputs == current
 
 
-@pytest.mark.known_bug
-@pytest.mark.xfail(strict=True, reason="sigma2 is drawn as log10(sigma2) and used as a physical sigma2")
 def test_dream_estimesigma_records_positive_sigma2(run_demo_mcmc):
     """With the default sigma2 range, the recorded sigma2 are variances, so they are positive."""
     column = run_demo_mcmc(nb_iter=SHORT_N_ITER, nb_chain=N_CHAIN, nitmaxburning=SHORT_N_BURN_IN_MAX,

@@ -934,10 +934,11 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
             sigma2_temp_prior = Prior((sigma2, sigma2), 0, lambda x: 1)
             sigma2_distrib = sigma2_temp_prior.density
         else:
-            sigma2_temp_prior = Prior(
-                (SIGMA2_MIN_T, SIGMA2_MAX_T), RANDOMWALKSIGMAT, lambda x: 1 / x
-            )
+            # uniform in the MCMC space of the prior, log10(sigma2) for this range: the Jeffreys prior 1 / sigma2
+            sigma2_temp_prior = Prior((SIGMA2_MIN_T, SIGMA2_MAX_T), RANDOMWALKSIGMAT)
             sigma2_distrib = sigma2_temp_prior.density
+        # the chains move sigma2 in the MCMC space of its prior; the energy and the states use the physical value
+        sigma2_physical = sigma2_temp_prior.mcmc_to_physical
 
         # vérification des types des arguments
         if isinstance(quantile, Number):
@@ -1047,7 +1048,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                 _temp_iter_chain[j] = column.get_temperatures_solve()
                 _flow_iter_chain[j] = column.get_flows_solve()
                 Energy[j] = compute_energy(
-                    _temp_iter_chain[j][ind_ref], temp_ref, sigma2_chain[j], sigma2_distrib
+                    _temp_iter_chain[j][ind_ref], temp_ref, sigma2_physical(sigma2_chain[j]), sigma2_distrib
                 )
 
             ### stockage des résultats
@@ -1111,7 +1112,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                     Energy_Proposal = compute_energy(
                         temp_proposal[ind_ref],
                         temp_ref,
-                        sigma2_temp_proposal,
+                        sigma2_physical(sigma2_temp_proposal),
                         sigma2_distrib,
                     )  # calcul de l'énergie
 
@@ -1182,7 +1183,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                         layers=X[j].copy(),  # copy: X[j] is overwritten in place on acceptance
                         energy=Energy[j],
                         ratio_accept=1,
-                        sigma2_temp=sigma2_chain[j],
+                        sigma2_temp=sigma2_physical(sigma2_chain[j]),
                     )
                 )
 
@@ -1240,7 +1241,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                     Energy_Proposal = compute_energy(
                         temp_proposal[ind_ref],
                         temp_ref,
-                        sigma2_temp_proposal,
+                        sigma2_physical(sigma2_temp_proposal),
                         sigma2_distrib,
                     )  # calcul de l'énergie
                     # calcul de la probabilité d'accpetation
@@ -1264,7 +1265,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                                 layers=X[j].copy(), # copy: X[j] is overwritten in place on acceptance
                                 energy=Energy[j],
                                 ratio_accept=1,
-                                sigma2_temp=sigma2_temp_proposal,
+                                sigma2_temp=sigma2_physical(sigma2_temp_proposal),
                             )
                         )
 
@@ -1335,11 +1336,11 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                         energy=compute_energy(
                             self.temperatures_solve[ind_ref, :],
                             temp_ref,
-                            sigma2=init_sigma2_temp,
+                            sigma2=sigma2_physical(init_sigma2_temp),
                             sigma2_distrib=sigma2_distrib,
                         ),
                         ratio_accept=1,
-                        sigma2_temp=init_sigma2_temp,
+                        sigma2_temp=sigma2_physical(init_sigma2_temp),
                     )
                 )
 
@@ -1364,7 +1365,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                 # on fait une proposition de pas
                 self.perturb_params()
                 sigma2_temp_proposal = sigma2_temp_prior.perturb(
-                    self._states[-1].sigma2_temp
+                    sigma2_temp_prior.physical_to_mcmc(self._states[-1].sigma2_temp)
                 )
 
                 # on calcule l'énergie pour les nouveaux paramètres
@@ -1373,7 +1374,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                 Energy_Proposal = compute_energy(
                     self.temperatures_solve[ind_ref, :],
                     temp_ref,
-                    sigma2_temp_proposal,
+                    sigma2_physical(sigma2_temp_proposal),
                     sigma2_distrib=sigma2_temp_prior.density,
                 )
 
@@ -1392,7 +1393,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                             layers=self._get_list_mcmc_params(),
                             energy=Energy_Proposal,
                             ratio_accept=nb_accepted / (i + 1),
-                            sigma2_temp=sigma2_temp_proposal,
+                            sigma2_temp=sigma2_physical(sigma2_temp_proposal),
                         )
                     )
 
@@ -2203,9 +2204,11 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
 
 
 def compute_energy(temp_simul, temp_ref, sigma2, sigma2_distrib):
+    """Negative log-posterior of the temperature measurements: Gaussian errors of variance sigma2, without the
+    constant (n/2) log(2 pi), and the prior density of sigma2."""
     norm2 = np.linalg.norm(temp_ref - temp_simul) ** 2
     return (
-        (size(temp_ref) * log(sigma2))
+        (size(temp_ref) * log(sigma2) / 2)
         + norm2 / (2 * sigma2)
         - log(sigma2_distrib(sigma2))
     )

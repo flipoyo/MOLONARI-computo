@@ -29,8 +29,6 @@ def test_energy_with_unit_sigma2_is_half_sum_of_squares():
     assert E == pytest.approx(measured.size * SHIFT_K**2 / 2)
 
 
-@pytest.mark.known_bug
-@pytest.mark.xfail(strict=True, reason="the log(sigma2) coefficient is n; the Gaussian likelihood gives n/2")
 def test_energy_matches_gaussian_negative_log_likelihood():
     simulated, measured = shifted_measurements()
     n = measured.size
