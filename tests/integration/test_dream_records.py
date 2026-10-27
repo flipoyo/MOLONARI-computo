@@ -20,7 +20,7 @@ SHORT_N_ITER = 10
 SHORT_N_BURN_IN_MAX = 5
 SIGMA2_MIN_LINEAR = 0.1  # ratio 10 to SIGMA2_MAX_T, below the log threshold: sigma2 stays on a linear scale
 
-ENERGY_RTOL = 1e-6       # the replay solves the same float32 parameters again
+ENERGY_RTOL = 1e-12      # the replay solves the same float64 parameters again
 QUANTILE_RTOL = 1e-6
 
 

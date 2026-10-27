@@ -18,14 +18,14 @@ CR_PROBABILITIES = np.full(N_CR, 1 / N_CR)
 GAMMA_N_CHAIN = 3
 GAMMA_DELTA = 1
 GAMMA_CHAIN = 0
-CHAIN_1 = np.arange(1, N_PARAM + 1, dtype=np.float32)  # 1 … 5
+CHAIN_1 = np.arange(1, N_PARAM + 1, dtype=np.float64)  # 1 … 5
 CHAIN_2 = -CHAIN_1                                       # |X1 - X2| = 2, 4, 6, 8, 10
 WIDE_RANGE = (-1e6, 1e6)        # far from every proposal: no wrapping
 NO_NOISE = 0.0
 N_GAMMA_DRAWS = 10000
 N_STANDARD_ERRORS = 4           # tolerance of the frequency test
 CHAINS_PER_DIFFERENCE = 2       # gamma = GAMMA_FACTOR / sqrt(2 * delta * d*) (ter Braak 2006)
-RELATIVE_TOLERANCE = 1e-5       # proposals are float32
+RELATIVE_TOLERANCE = 1e-12      # proposals are float64
 
 # Realistic proposals: compute_mcmc defaults, ranges in the MCMC space of the demo priors
 N_CHAIN = 7                     # at least 2 * DELTA + 1
@@ -58,7 +58,7 @@ def propose(X, ranges, is_param_fixed, chain, delta, c, c_star):
 def random_chains(n_chain, ranges):
     """Chains drawn uniformly inside the ranges, one layer per row of ranges."""
     lower, upper = ranges[..., 0], ranges[..., 1]
-    return np.random.uniform(lower, upper, (n_chain, *lower.shape)).astype(np.float32)
+    return np.random.uniform(lower, upper, (n_chain, *lower.shape)).astype(np.float64)
 
 
 @pytest.fixture(scope="module")
@@ -66,7 +66,7 @@ def gamma_draws():
     """Gamma and number of moved parameters d* of N_GAMMA_DRAWS proposals.
     scope="module": computed once, shared by the tests of this file."""
     np.random.seed(SEED)
-    X = np.zeros((GAMMA_N_CHAIN, 1, N_PARAM), np.float32)
+    X = np.zeros((GAMMA_N_CHAIN, 1, N_PARAM), np.float64)
     X[1, 0], X[2, 0] = CHAIN_1, CHAIN_2
     ranges = np.tile(WIDE_RANGE, (1, N_PARAM, 1))
     is_param_fixed = np.zeros((1, N_PARAM), bool)

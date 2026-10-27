@@ -1,4 +1,4 @@
-from numpy import float32, zeros
+from numpy import float64, zeros
 
 from numpy.linalg import solve
 
@@ -68,7 +68,7 @@ class Linear_system:
         return RHO_W * C_W * self.K_list / self.rho_mc_m_list
 
     def compute_dK_list(self, K_list, n_cell, dz):
-        list = zeros(n_cell, float32)
+        list = zeros(n_cell, float64)
         list[0] = (K_list[1] - K_list[0]) / dz
         list[-1] = (K_list[-1] - K_list[-2]) / dz
         for idx in range(1, len(list) - 1):
@@ -76,7 +76,7 @@ class Linear_system:
         return list
 
     def compute_H_res(self):
-        H_res = zeros((self.n_cell, self.n_times), float32)
+        H_res = zeros((self.n_cell, self.n_times), float64)
         H_res[:, 0] = self.H_init[:]
         return H_res
 
@@ -187,7 +187,7 @@ class H_stratified(Linear_system):
             )
 
     def nablaH(self):
-        nablaH = np.zeros((self.n_cell, self.n_times), np.float32)
+        nablaH = np.zeros((self.n_cell, self.n_times), np.float64)
 
         nablaH[0, :] = 2 * (self.H_res[1, :] - self.H_riv) / (3 * self.dz)
 
@@ -335,7 +335,7 @@ class H_stratified(Linear_system):
             upper_diagonal_A[pos_idx + 1] = -K2 * self.alpha / self.dz**2
 
     def compute_c(self, j):
-        c = zeros(self.n_cell, float32)
+        c = zeros(self.n_cell, float64)
         c[0] = (8 * self.K_list[0] / (3 * self.dz**2)) * (
             self.alpha * self.H_riv[j + 1] + (1 - self.alpha) * self.H_riv[j]
         )
@@ -396,10 +396,10 @@ class T_stratified(Linear_system):
         self.q_s_list = q_s_list
 
     def compute_T_stratified(self):
-        self.T_res = np.zeros((self.n_cell, self.n_times), np.float32)
+        self.T_res = np.zeros((self.n_cell, self.n_times), np.float64)
         #nouvelle ligne pour stocker le flux de chaleur associé à la source d'eau q_s
         #il doit être calculé de manière semi-implicite pour la cohérence de la résolution
-        self.source_heat_flux = np.zeros((self.n_cell, self.n_times), np.float32)
+        self.source_heat_flux = np.zeros((self.n_cell, self.n_times), np.float64)
 
         self.T_res[:, 0] = self.T_init
         #calcul du flux au temps initial
@@ -486,7 +486,7 @@ class T_stratified(Linear_system):
     #La fonction suivante permet le calcul de vecteur c qui intègre les conditions au bord dans le syhstème matriciel
 
     def _compute_c(self, j):
-        c = np.zeros(self.n_cell, np.float32)
+        c = np.zeros(self.n_cell, np.float64)
         c[0] = (
             8 * self.ke_list[0] * self.alpha / (3 * self.dz**2)
             - 2 * self.alpha * self.ae_list[0] * self.nablaH[0, j] / (3 * self.dz)
@@ -565,7 +565,7 @@ class T_stratified(Linear_system):
         return lower_diagonal, diagonal, upper_diagonal
 
     def _construct_A_matrix(self, lower_diagonal, diagonal, upper_diagonal):
-        A = np.zeros((self.n_cell, self.n_cell), float32)
+        A = np.zeros((self.n_cell, self.n_cell), float64)
         A[0, 0] = diagonal[0]
         A[0, 1] = upper_diagonal[0]
         for i in range(1, self.n_cell - 1):
@@ -802,7 +802,7 @@ class HTK_stratified(Linear_system):
             upper_diagonal_A[pos_idx + 1] = -K2 * self.alpha / self.dz**2
 
     def compute_c(self, j):
-        c = zeros(self.n_cell, float32)
+        c = zeros(self.n_cell, float64)
         c[0] = (8 * self.K_list[0] / (3 * self.dz**2)) * (
             self.alpha * self.H_riv[j + 1] + (1 - self.alpha) * self.H_riv[j]
         )

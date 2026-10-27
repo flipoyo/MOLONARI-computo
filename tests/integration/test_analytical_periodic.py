@@ -23,9 +23,9 @@ LAYER = {"name": "sand", "zLow": DEPTH_SENSORS[-1], "IntrinK": 1e-12, "n": 0.1,
 
 COMPARED_DEPTH = 0.4                              # m, cells compared with the analytical solution
 COMPARED_DURATION = 2 * PERIOD                    # the last two days
-# Measured with this set-up: 0.012 K (conduction) and 0.024-0.025 K (dH = +-0.1 m); the velocity with the wrong
-# sign gives 0.19-0.20 K. Most of the difference comes from the float32 temperature solver.
-TEMPERATURE_ATOL = 0.05                           # K
+# Measured with this set-up: 0.0040 K (conduction) and 0.0035-0.0047 K (dH = +-0.1 m); the velocity with the wrong
+# sign gives 0.18-0.19 K. With the former float32 temperature solver, the differences were 0.012-0.025 K.
+TEMPERATURE_ATOL = 0.01                           # K
 PHASE = np.pi / 3                                 # rad, a non-zero phase of the river signal
 
 

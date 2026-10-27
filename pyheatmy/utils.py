@@ -2,7 +2,7 @@
 # NF Ce fichier est un fichier 'poubelle', on ne comprend pas à quoi sont reliées les méthodes. Réorganiser dans les .py adhoc, éventuellement en créer de nouveaux
 #
 from numpy import (
-    float32,
+    float64,
     zeros,
     nansum,
     sum,
@@ -142,7 +142,7 @@ def create_multi_periodic_signal(
             # Only an offset provided
             if verbose:
                 print("Only global offset provided. Returning constant signal.")
-            return full(len(dates), global_offset, dtype=float32)
+            return full(len(dates), global_offset, dtype=float64)
     else:
         # No global offset supplied; treat all entries as component triplets
         global_offset = 0.0
@@ -155,7 +155,7 @@ def create_multi_periodic_signal(
 
     dt = t_step_list[0].total_seconds()
     t_range = arange(len(dates)) * dt
-    signal = zeros(len(dates), dtype=float32)
+    signal = zeros(len(dates), dtype=float64)
 
     if verbose:
         print("Multiple periodic signals detected, summing components with global offset.")
@@ -170,7 +170,7 @@ def create_multi_periodic_signal(
         # If period is CODE_scalar treat as a constant component. We use amplitude + phase as the value
         # for backward-like behaviour where a constant component previously used the 'offset' slot.
         if period == CODE_scalar:
-            component = full(len(dates), amplitude + phase, dtype=float32)
+            component = full(len(dates), amplitude + phase, dtype=float64)
         else:
             component = amplitude * sin(2 * pi * t_range / period + phase)
         signal += component

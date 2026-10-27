@@ -553,7 +553,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
 
             nablaH = H_strat.nablaH()
 
-            flows = np.zeros((nb_cells, len(self._times)), np.float32)
+            flows = np.zeros((nb_cells, len(self._times)), np.float64)
 
             for i in range(nb_cells):
                 flows[i, :] = -K_list[i] * nablaH[i, :]
@@ -767,7 +767,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
         ) ** 2  # conductivité thermique du milieu poreux équivalent
 
         # création du gradient de température
-        nablaT = np.zeros((nb_cells, len(self._times)), np.float32)
+        nablaT = np.zeros((nb_cells, len(self._times)), np.float64)
 
         for i in range(1, nb_cells - 1):
             nablaT[i, :] = (
@@ -776,7 +776,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
         nablaT[0, :] = nablaT[1, :]
         nablaT[nb_cells - 1, :] = nablaT[nb_cells - 2, :]
 
-        conduc_flows = np.zeros((nb_cells, len(self._times)), np.float32)
+        conduc_flows = np.zeros((nb_cells, len(self._times)), np.float64)
 
         for i in range(nb_cells):
             conduc_flows[i, :] = lambda_m_list[i] * nablaT[i, :]
@@ -815,8 +815,8 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
         ranges,
         is_param_fixed,  # <-- NOUVEL ARGUMENT
     ):
-        X_proposal = np.zeros((nb_layer, nb_param), np.float32)
-        dX = np.zeros((nb_layer, nb_param), np.float32)
+        X_proposal = np.zeros((nb_layer, nb_param), np.float64)
+        dX = np.zeros((nb_layer, nb_param), np.float64)
 
         for l in range(nb_layer):
             # --- LOGIQUE MODIFIÉE POUR IGNORER LES PARAMÈTRES FIXES ---
@@ -964,7 +964,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                     is_param_fixed[l, p] = True
 
         # variables pour l'état courant
-        temp_proposal = np.zeros((self._nb_cells, len(self._times)), np.float32)
+        temp_proposal = np.zeros((self._nb_cells, len(self._times)), np.float64)
 
         # variables liées au sous-échantillonnage
         nb_cells_sous_ech = int(np.ceil(self._nb_cells / n_sous_ech_space))
@@ -976,13 +976,14 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
         if nb_chain > 1:
             # Voir si ces variables ne peuvent pas devenir des attributs de State
             _temp_iter_chain = np.zeros(
-                (nb_chain, self._nb_cells, len(self._times)), np.float32
+                (nb_chain, self._nb_cells, len(self._times)), np.float64
             )  # dernière température acceptée pour chaque chaine
             _flow_iter_chain = np.zeros(
-                (nb_chain, self._nb_cells, len(self._times)), np.float32
+                (nb_chain, self._nb_cells, len(self._times)), np.float64
             )  # dernier débit accepté pour chaque chaine
 
             # nombre d'itérations sous-échantillonnées avec initialisation
+            # float32: these samples only feed the quantiles, and their size grows with the length of the series
             _temp = np.zeros(
                 (sizesubsampling, nb_chain, nb_cells_sous_ech, nb_times_sous_ech),
                 np.float32,
@@ -1007,9 +1008,9 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
             # objets liés à DREAM
             cr_vec = np.arange(1, n_CR + 1) / n_CR  # Valeur des crossover
             n_id = np.zeros(
-                (nb_layer, n_CR), np.float32
+                (nb_layer, n_CR), np.float64
             )  # Nombre de fois où chaque crossover est utilisé
-            J = np.zeros((nb_layer, n_CR), np.float32)  # Matrice des sauts
+            J = np.zeros((nb_layer, n_CR), np.float64)  # Matrice des sauts
             pcr = (
                 np.ones((nb_layer, n_CR)) / n_CR
             )  # Probabilité de choisir un crossover, initialisé de manière uniforme
@@ -1035,8 +1036,8 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
             # et on les stocke dans l'attribut _state de la colonne qui ne sert qu'à plot les distribution et à récupérer les paramètres qui minimisent l'énergie
 
             self._states = list()
-            X = np.zeros((nb_chain, nb_layer, nb_param), np.float32)
-            Energy = np.zeros((nb_chain), np.float32)
+            X = np.zeros((nb_chain, nb_layer, nb_param), np.float64)
+            Energy = np.zeros((nb_chain), np.float64)
             sigma2_chain = np.zeros(nb_chain, np.float64)  # sigma2 courant de chaque chaîne
 
             for j, column in enumerate(multi_chain):
@@ -1056,7 +1057,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
             # Sert uniquement pour le calcul du critère de Gelman-Rubin
 
             XBurnIn = np.zeros(
-                (nitmaxburning + 1, nb_chain, nb_layer, nb_param), np.float32
+                (nitmaxburning + 1, nb_chain, nb_layer, nb_param), np.float64
             )
 
             # en particulier la première instance de XBurnIn est égale à X :
@@ -1188,7 +1189,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                 )
 
             # On suit les taux d'acceptation pour chaque chaîne grâce à un vecteur de taille nb_chain qu'on incrémente à chaque itération
-            self._acceptance = np.zeros(nb_chain, np.float32)
+            self._acceptance = np.zeros(nb_chain, np.float64)
 
             # Transition après le burn in
 
@@ -1270,7 +1271,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                         )
 
                     else:
-                        dX = np.zeros((nb_layer, nb_param), np.float32)
+                        dX = np.zeros((nb_layer, nb_param), np.float64)
                         # On ne met pas à jour l'état :
                         self._states.append(self._states[-nb_chain])
                         # On remet les anciens paramètres pour la colonne :
@@ -1311,11 +1312,12 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
 
         else:  # cas single chain
             _temp_iter = np.zeros(
-                (self._nb_cells, len(self._times)), np.float32
+                (self._nb_cells, len(self._times)), np.float64
             )  # dernière température acceptée pour la colonne
             _flow_iter = np.zeros(
-                (self._nb_cells, len(self._times)), np.float32
+                (self._nb_cells, len(self._times)), np.float64
             )  # dernier débit accepté pour la colonne
+            # float32: these samples only feed the quantiles, and their size grows with the length of the series
             _temp = np.zeros(
                 (sizesubsampling, self._nb_cells, len(self._times)), np.float32
             )  # stockage des températures sous échantillonées pendant la mcmc
