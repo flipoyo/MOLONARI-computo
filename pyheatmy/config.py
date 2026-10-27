@@ -46,8 +46,8 @@ SYMLOG_LINTHRESH_RATIO= 1e2
 
 # prior initialisation 
 INTRINK_INTERVAL = (1e-15, 1e-11)
-INTRINK_SIGMA = 0.01
 INTRINK_DEFAULT = 1e-13
+INTRINK_MAX = 1e-4  # m2, borne haute acceptée par Layer, au-dessus de tout milieu poreux : refuse l'ancienne notation -log10(k) (11 pour 1e-11 m2)
 
 N_INTERVAL = (0.01, 0.25)
 N_SIGMA = 0.01
