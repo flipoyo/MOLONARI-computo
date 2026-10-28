@@ -20,6 +20,8 @@ from numpy import (
     pi,
     sin,
     full,
+    inf,
+    nan,
 )
 
 # import numpy as np
@@ -30,37 +32,27 @@ import os
 from pyheatmy.config import *
 
 
-def gelman_rubin(nb_current_iter, nb_param, nb_layer, chains, threshold=1.2):
-    R = zeros((nb_layer, nb_param))
-    for l in range(nb_layer):
-        chains_layered = chains[:, :, l, :]
-        # Variances intra-chaînes des paramètres
-        Var_intra = var(chains_layered, axis=0)
-
-        # Moyenne des variances intra-chaîne
-        var_intra = mean(Var_intra, axis=0)
-
-        # Moyennes de chaque chaîne
-        means_chains = mean(chains_layered, axis=0)
-
-        # Variance entre les moyennes des chaînes, dite inter-chaînes
-        var_inter = var(means_chains, axis=0)
-
-        # Calcul de l'indicateur de Gelman-Rubin
-        for j in range(nb_param):
-            if isclose(var_intra[j], 0):
-                R[l, j] = 2
-            else:
-                R[l, j] = sqrt(
-                    var_inter[j]
-                    / var_intra[j]
-                    * (nb_current_iter - 1)
-                    / nb_current_iter
-                    + 1
-                )
-
-    # On considère que la phase de burn-in est terminée dès que R < threshold
-    return all(R < threshold)
+def gelman_rubin(chains, is_param_fixed):
+    """R_hat of Gelman and Rubin (1992) for each parameter of each layer, as computed by DREAM (Vrugt, 2016,
+    Eqs. 32-35): from the last half of the samples of each chain, without the degrees of freedom factor.
+    chains is a (sample, chain, layer, parameter) array, is_param_fixed a (layer, parameter) array of booleans.
+    A fixed parameter has no R_hat (nan). A free parameter has an infinite R_hat when its chains do not move or
+    when the last half has a single sample."""
+    nb_sample, nb_chain = chains.shape[:2]
+    n = nb_sample // 2
+    last_half = chains[nb_sample - n :]
+    r_hat = full(chains.shape[2:], inf)
+    if n > 1:
+        within = mean(var(last_half, axis=0, ddof=1), axis=0)  # W
+        between = var(mean(last_half, axis=0), axis=0, ddof=1)  # B / n
+        moving = within > 0
+        sigma2_plus = (n - 1) / n * within + between
+        r_hat[moving] = sqrt(
+            (nb_chain + 1) / nb_chain * sigma2_plus[moving] / within[moving]
+            - (n - 1) / (nb_chain * n)
+        )
+    r_hat[is_param_fixed] = nan
+    return r_hat
 
 def create_periodic_signal(dates : list[datetime]
 ,params : list,signal_name="TBD",verbose=True): #params has 3 arguments 0 --> amplitude, 1 --> period (no period for CODE_scalar), 2 --> offset

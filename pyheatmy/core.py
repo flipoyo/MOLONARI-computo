@@ -1071,6 +1071,8 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
             if verbose:
                 print("--- Begin Burn in phase ---")
 
+            r_hat = gelman_rubin(XBurnIn[:1], is_param_fixed)
+            burn_in_converged = np.all(r_hat[~is_param_fixed] <= threshold)
             for i in trange(nitmaxburning, desc="Burn in phase"):
                 # Initialisation pour les nouveaux paramètres
                 std_X = np.std(X, axis=0)  # calcul des écarts types des paramètres
@@ -1166,14 +1168,26 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                 # Fin d'une itération, on vérifie si on peut sortir du burn-in
                 XBurnIn[i + 1] = X
 
-                if gelman_rubin(
-                    i + 2, nb_param, nb_layer, XBurnIn[: i + 2], threshold=threshold
-                ):
+                r_hat = gelman_rubin(XBurnIn[: i + 2], is_param_fixed)
+                burn_in_converged = np.all(r_hat[~is_param_fixed] <= threshold)
+                if burn_in_converged:
                     if verbose:
                         print(f"Burn-in finished after : {nb_burn_in_iter} iterations")
                     break  # on sort du burn-in
 
                 nb_burn_in_iter += 1  # incrémentation du numbre d'itération de burn-in
+
+            if not burn_in_converged:
+                l, p = np.unravel_index(
+                    np.argmax(np.where(is_param_fixed, -np.inf, r_hat)), r_hat.shape
+                )
+                warnings.warn(
+                    f"The DREAM burn-in reached nitmaxburning = {nitmaxburning} iterations without converging: "
+                    f"R_hat = {r_hat[l, p]:.3g} for '{PARAM_LIST[p]}' of layer '{self.all_layers[l].name}', "
+                    f"above the threshold {threshold}. The following states may not sample the posterior; "
+                    f"increase nitmaxburning.",
+                    UserWarning,
+                )
 
             self.nb_burn_in_iter = nb_burn_in_iter
 
