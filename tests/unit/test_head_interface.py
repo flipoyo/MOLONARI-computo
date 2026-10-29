@@ -38,7 +38,7 @@ LOW_UPPER_INTRINK = 1e-14
 LOW_LOWER_INTRINK = 1e-15
 INITIAL_HEAD = np.linspace(0.3, 0.0, N_CELL)       # m
 RIVER_HEAD = np.array([0.3, 0.5, 0.4])            # m, at the three times
-FLOAT32_TOLERANCE = 1e-5                          # the solver stores heads in float32
+HEAD_RTOL = 1e-12                                 # the solver works in float64
 
 def corrected_diagonals(ss_list, z_low, inter_cara):
     """Diagonals of A and B for one time step, after the interface correction."""
@@ -128,5 +128,5 @@ def test_variable_time_step_run_equals_chain_of_single_steps(z_low, inter_cara):
     both_steps = solve_heads(TWO_STEPS, INITIAL_HEAD, RIVER_HEAD, z_low, inter_cara)
     first = solve_heads(TWO_STEPS[:1], INITIAL_HEAD, RIVER_HEAD[:2], z_low, inter_cara)[:, 1]
     second = solve_heads(TWO_STEPS[1:], first, RIVER_HEAD[1:], z_low, inter_cara)[:, 1]
-    np.testing.assert_allclose(both_steps[:, 1], first, rtol=FLOAT32_TOLERANCE)
-    np.testing.assert_allclose(both_steps[:, 2], second, rtol=FLOAT32_TOLERANCE)
+    np.testing.assert_allclose(both_steps[:, 1], first, rtol=HEAD_RTOL)
+    np.testing.assert_allclose(both_steps[:, 2], second, rtol=HEAD_RTOL)

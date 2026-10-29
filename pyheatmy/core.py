@@ -96,17 +96,17 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
         self._quantiles_temperatures = None
         # dictionnaire indexé par les quantiles (0.05,0.5,0.95) à qui on a associe un array de deux dimensions : dimension 1 les profondeurs, dimension 2 : liste des valeurs de débits spécifiques associés au quantile, de longueur les temps de mesure
         self._quantiles_flows = None
+        self.tests([t for t, _ in T_measures])  # teste que les conditions nécessaires à l'analyse sont remplies
+        # températures connues au premier temps; un capteur sans mesure (NaN) est laissé de côté
+        T_first = np.array([self._T_riv[0], *self._T_measures[0], self._T_aq[0]])
+        measured = ~np.isnan(T_first)
         self.lagr = Lagrange(
-            np.array(self._real_z),
-            np.array([self._T_riv[0], *self._T_measures[0], self._T_aq[0]]),
+            self._real_z[measured], T_first[measured]
         )  # crée le polynome interpolateur de lagrange faisant coincider les températures connues à la profondeur réelle
-        self.linear = interp1d(
-            self._real_z, [self._T_riv[0], *self._T_measures[0], self._T_aq[0]]
-        )
+        self.linear = interp1d(self._real_z[measured], T_first[measured])
         # crée la fonction affine par morceaux faisant coincider les températures connues à la profondeur réelle
         self.inter_mode = inter_mode
         self.eps = eps
-        self.tests()  # teste que les conditions nécessaires à l'analyse sont remplies
         if verbose:
             print("Column created with success")
             print(f"Number of time steps: {self.get_timelength()}")
@@ -156,23 +156,51 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
     def initialization(self, nb_cells):
         self._nb_cells = nb_cells
 
-    def tests(self):
-        # teste que les données sont aux bons formats
-        if np.shape(self._dH) != np.shape(self._T_aq) or (
-            np.shape(self._dH) != np.shape(self._T_riv)
-            # or (np.shape(self._T_measures[1]) != (3,))
+    def tests(self, T_dates):
+        """Checks the measurements before any computation. The dates of dH_measures and T_measures must be the
+        same and strictly increasing, and the boundary conditions (head differential, river and aquifer
+        temperatures) are needed at every time. Missing temperatures at the sensors (NaN) are left out of the
+        initial profile, the energy of the MCMC and the RMSE, with a warning."""
+        if len(T_dates) != len(self._times):
+            raise ValueError(
+                f"dH_measures and T_measures must have the same number of times, got {len(self._times)} and "
+                f"{len(T_dates)}."
+            )
+        for j in range(1, len(self._times)):
+            if not self._times[j] > self._times[j - 1]:
+                raise ValueError(
+                    f"The dates of the measurements must be strictly increasing: date {j} ({self._times[j]}) is "
+                    f"not after date {j - 1} ({self._times[j - 1]})."
+                )
+        for j, (date_dH, date_T) in enumerate(zip(self._times, T_dates)):
+            if date_dH != date_T:
+                raise ValueError(
+                    f"dH_measures and T_measures must have the same dates; they differ at index {j}: {date_dH} "
+                    f"and {date_T}."
+                )
+        if self._T_measures.shape[1] + 1 != len(self.depth_sensors):
+            raise ValueError(
+                f"Each value of T_measures must have one temperature per depth of depth_sensors, the last one for "
+                f"the aquifer: {len(self.depth_sensors)} depths, but {self._T_measures.shape[1] + 1} temperatures."
+            )
+        for values, name in (
+            (self._dH, "head differential (dH_measures)"),
+            (self._T_riv, "river temperature (dH_measures)"),
+            (self._T_aq, "aquifer temperature (last value of T_measures)"),
         ):
-            raise NameError("Problème dans la taille des donées")
-
-        # teste qu'il ne manque pas de données pour les conditions aux limites
-        if np.isnan(np.sum(self._T_aq)):
-            raise NameError("Donnée(s) manquante(s) pour la température aquifère")
-
-        if np.isnan(np.sum(self._T_riv)):
-            raise NameError("Donnée(s) manquante(s) pour la température rivière")
-
-        if np.isnan(np.sum(self._dH)):
-            raise NameError("Donnée(s) manquante(s) pour la pression")
+            if np.isnan(values).any():
+                raise ValueError(
+                    f"Missing values (NaN) in the {name}: the boundary conditions are needed at every time."
+                )
+        missing = np.isnan(self._T_measures)
+        if missing.any():
+            empty = [f"{z} m" for z, none in zip(self.depth_sensors, missing.all(axis=0)) if none]
+            warnings.warn(
+                f"{missing.sum()} of {missing.size} temperature measurements at the sensors are missing (NaN); "
+                f"they are left out of the initial profile, the energy of the MCMC and the RMSE."
+                + (f" Sensors without any measurement: {', '.join(empty)}." if empty else ""),
+                UserWarning,
+            )
 
     @classmethod
     def from_dict(cls, col_dict, verbose=False):
@@ -264,8 +292,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
 
             ## pour le cas uni-couche, on le simule dans H_stratified avec deux couches de mêmes paramètres
             array_IntrinK = np.array([IntrinK, IntrinK])
-            # array_K = 10 ** (-array_IntrinK * 1.0)
-            array_K = (RHO_W * G * 10.0**-array_IntrinK) * 1.0 / MU_W
+            array_K = calc_K(array_IntrinK)
             array_Ss = np.array([Ss, Ss])
             list_zLow = np.array([0.2])
             inter_cara = np.array([[nb_cells // 2, 0]])
@@ -386,8 +413,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                     for layer in self.all_layers
                 ]
             )
-            array_k = 10 ** (-array_IntrinK)
-            array_K = calc_K(array_k)
+            array_K = calc_K(array_IntrinK)
             heigth = abs(self._real_z[-1] - self._real_z[0])
             array_Ss = (
                 np.array([float(x.get_physical_params().n) for x in layersList])
@@ -555,7 +581,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
 
             nablaH = H_strat.nablaH()
 
-            flows = np.zeros((nb_cells, len(self._times)), np.float32)
+            flows = np.zeros((nb_cells, len(self._times)), np.float64)
 
             for i in range(nb_cells):
                 flows[i, :] = -K_list[i] * nablaH[i, :]
@@ -664,29 +690,18 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
             array with 4 elements which contains the RMSE for the non boundary sensors, and the total RMSE
         """
 
-        # Number of sensors (except boundary conditions : river and aquifer)
-        nb_sensors = len(self._T_measures[0])
-
-        # Number of times for which we have measures
-        nb_times = len(self._T_measures)
-
-        # Array of RMSE for each sensor
+        # Array of RMSE for each sensor (except boundary conditions : river and aquifer), over its measured times
         list_RMSE = np.array(
             [
-                np.sqrt(
-                    np.nansum(
-                        (self.get_temperatures_solve()[id, :] - temperatures_obs) ** 2
-                    )
-                    / nb_times
-                )
+                rmse_measured(self.get_temperatures_solve()[id, :], temperatures_obs)
                 for id, temperatures_obs in zip(
                     self.get_id_sensors(), self._T_measures.T
                 )
             ]
         )
 
-        # Total RMSE
-        total_RMSE = np.sqrt(np.nansum(list_RMSE**2) / nb_sensors)
+        # Total RMSE, over the sensors with measurements
+        total_RMSE = np.sqrt(np.mean(list_RMSE[~np.isnan(list_RMSE)] ** 2))
 
         return np.append(list_RMSE, total_RMSE)
 
@@ -769,7 +784,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
         ) ** 2  # conductivité thermique du milieu poreux équivalent
 
         # création du gradient de température
-        nablaT = np.zeros((nb_cells, len(self._times)), np.float32)
+        nablaT = np.zeros((nb_cells, len(self._times)), np.float64)
 
         for i in range(1, nb_cells - 1):
             nablaT[i, :] = (
@@ -778,7 +793,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
         nablaT[0, :] = nablaT[1, :]
         nablaT[nb_cells - 1, :] = nablaT[nb_cells - 2, :]
 
-        conduc_flows = np.zeros((nb_cells, len(self._times)), np.float32)
+        conduc_flows = np.zeros((nb_cells, len(self._times)), np.float64)
 
         for i in range(nb_cells):
             conduc_flows[i, :] = lambda_m_list[i] * nablaT[i, :]
@@ -817,8 +832,8 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
         ranges,
         is_param_fixed,  # <-- NOUVEL ARGUMENT
     ):
-        X_proposal = np.zeros((nb_layer, nb_param), np.float32)
-        dX = np.zeros((nb_layer, nb_param), np.float32)
+        X_proposal = np.zeros((nb_layer, nb_param), np.float64)
+        dX = np.zeros((nb_layer, nb_param), np.float64)
 
         for l in range(nb_layer):
             # --- LOGIQUE MODIFIÉE POUR IGNORER LES PARAMÈTRES FIXES ---
@@ -920,7 +935,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
             )
 
         n_sous_ech_iter = max(1, int(np.floor(nb_chain * nb_iter / NSAMPLEMIN)))
-        sizesubsampling = max(int(np.floor(nb_iter / n_sous_ech_iter)), 1)
+        sizesubsampling = max(int(np.ceil(nb_iter / n_sous_ech_iter)), 1)
 
         if verbose:
             print(
@@ -936,10 +951,11 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
             sigma2_temp_prior = Prior((sigma2, sigma2), 0, lambda x: 1)
             sigma2_distrib = sigma2_temp_prior.density
         else:
-            sigma2_temp_prior = Prior(
-                (SIGMA2_MIN_T, SIGMA2_MAX_T), RANDOMWALKSIGMAT, lambda x: 1 / x
-            )
+            # uniform in the MCMC space of the prior, log10(sigma2) for this range: the Jeffreys prior 1 / sigma2
+            sigma2_temp_prior = Prior((SIGMA2_MIN_T, SIGMA2_MAX_T), RANDOMWALKSIGMAT)
             sigma2_distrib = sigma2_temp_prior.density
+        # the chains move sigma2 in the MCMC space of its prior; the energy and the states use the physical value
+        sigma2_physical = sigma2_temp_prior.mcmc_to_physical
 
         # vérification des types des arguments
         if isinstance(quantile, Number):
@@ -965,7 +981,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                     is_param_fixed[l, p] = True
 
         # variables pour l'état courant
-        temp_proposal = np.zeros((self._nb_cells, len(self._times)), np.float32)
+        temp_proposal = np.zeros((self._nb_cells, len(self._times)), np.float64)
 
         # variables liées au sous-échantillonnage
         nb_cells_sous_ech = int(np.ceil(self._nb_cells / n_sous_ech_space))
@@ -977,13 +993,14 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
         if nb_chain > 1:
             # Voir si ces variables ne peuvent pas devenir des attributs de State
             _temp_iter_chain = np.zeros(
-                (nb_chain, self._nb_cells, len(self._times)), np.float32
+                (nb_chain, self._nb_cells, len(self._times)), np.float64
             )  # dernière température acceptée pour chaque chaine
             _flow_iter_chain = np.zeros(
-                (nb_chain, self._nb_cells, len(self._times)), np.float32
+                (nb_chain, self._nb_cells, len(self._times)), np.float64
             )  # dernier débit accepté pour chaque chaine
 
             # nombre d'itérations sous-échantillonnées avec initialisation
+            # float32: these samples only feed the quantiles, and their size grows with the length of the series
             _temp = np.zeros(
                 (sizesubsampling, nb_chain, nb_cells_sous_ech, nb_times_sous_ech),
                 np.float32,
@@ -1008,9 +1025,9 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
             # objets liés à DREAM
             cr_vec = np.arange(1, n_CR + 1) / n_CR  # Valeur des crossover
             n_id = np.zeros(
-                (nb_layer, n_CR), np.float32
+                (nb_layer, n_CR), np.float64
             )  # Nombre de fois où chaque crossover est utilisé
-            J = np.zeros((nb_layer, n_CR), np.float32)  # Matrice des sauts
+            J = np.zeros((nb_layer, n_CR), np.float64)  # Matrice des sauts
             pcr = (
                 np.ones((nb_layer, n_CR)) / n_CR
             )  # Probabilité de choisir un crossover, initialisé de manière uniforme
@@ -1036,8 +1053,8 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
             # et on les stocke dans l'attribut _state de la colonne qui ne sert qu'à plot les distribution et à récupérer les paramètres qui minimisent l'énergie
 
             self._states = list()
-            X = np.zeros((nb_chain, nb_layer, nb_param), np.float32)
-            Energy = np.zeros((nb_chain), np.float32)
+            X = np.zeros((nb_chain, nb_layer, nb_param), np.float64)
+            Energy = np.zeros((nb_chain), np.float64)
             sigma2_chain = np.zeros(nb_chain, np.float64)  # sigma2 courant de chaque chaîne
 
             for j, column in enumerate(multi_chain):
@@ -1049,7 +1066,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                 _temp_iter_chain[j] = column.get_temperatures_solve()
                 _flow_iter_chain[j] = column.get_flows_solve()
                 Energy[j] = compute_energy(
-                    _temp_iter_chain[j][ind_ref], temp_ref, sigma2_chain[j], sigma2_distrib
+                    _temp_iter_chain[j][ind_ref], temp_ref, sigma2_physical(sigma2_chain[j]), sigma2_distrib
                 )
 
             ### stockage des résultats
@@ -1057,7 +1074,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
             # Sert uniquement pour le calcul du critère de Gelman-Rubin
 
             XBurnIn = np.zeros(
-                (nitmaxburning + 1, nb_chain, nb_layer, nb_param), np.float32
+                (nitmaxburning + 1, nb_chain, nb_layer, nb_param), np.float64
             )
 
             # en particulier la première instance de XBurnIn est égale à X :
@@ -1071,6 +1088,8 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
             if verbose:
                 print("--- Begin Burn in phase ---")
 
+            r_hat = gelman_rubin(XBurnIn[:1], is_param_fixed)
+            burn_in_converged = np.all(r_hat[~is_param_fixed] <= threshold)
             for i in trange(nitmaxburning, desc="Burn in phase"):
                 # Initialisation pour les nouveaux paramètres
                 std_X = np.std(X, axis=0)  # calcul des écarts types des paramètres
@@ -1113,7 +1132,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                     Energy_Proposal = compute_energy(
                         temp_proposal[ind_ref],
                         temp_ref,
-                        sigma2_temp_proposal,
+                        sigma2_physical(sigma2_temp_proposal),
                         sigma2_distrib,
                     )  # calcul de l'énergie
 
@@ -1166,14 +1185,26 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                 # Fin d'une itération, on vérifie si on peut sortir du burn-in
                 XBurnIn[i + 1] = X
 
-                if gelman_rubin(
-                    i + 2, nb_param, nb_layer, XBurnIn[: i + 2], threshold=threshold
-                ):
+                r_hat = gelman_rubin(XBurnIn[: i + 2], is_param_fixed)
+                burn_in_converged = np.all(r_hat[~is_param_fixed] <= threshold)
+                if burn_in_converged:
                     if verbose:
                         print(f"Burn-in finished after : {nb_burn_in_iter} iterations")
                     break  # on sort du burn-in
 
                 nb_burn_in_iter += 1  # incrémentation du numbre d'itération de burn-in
+
+            if not burn_in_converged:
+                l, p = np.unravel_index(
+                    np.argmax(np.where(is_param_fixed, -np.inf, r_hat)), r_hat.shape
+                )
+                warnings.warn(
+                    f"The DREAM burn-in reached nitmaxburning = {nitmaxburning} iterations without converging: "
+                    f"R_hat = {r_hat[l, p]:.3g} for '{PARAM_LIST[p]}' of layer '{self.all_layers[l].name}', "
+                    f"above the threshold {threshold}. The following states may not sample the posterior; "
+                    f"increase nitmaxburning.",
+                    UserWarning,
+                )
 
             self.nb_burn_in_iter = nb_burn_in_iter
 
@@ -1184,12 +1215,12 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                         layers=X[j].copy(),  # copy: X[j] is overwritten in place on acceptance
                         energy=Energy[j],
                         ratio_accept=1,
-                        sigma2_temp=sigma2_chain[j],
+                        sigma2_temp=sigma2_physical(sigma2_chain[j]),
                     )
                 )
 
             # On suit les taux d'acceptation pour chaque chaîne grâce à un vecteur de taille nb_chain qu'on incrémente à chaque itération
-            self._acceptance = np.zeros(nb_chain, np.float32)
+            self._acceptance = np.zeros(nb_chain, np.float64)
 
             # Transition après le burn in
 
@@ -1242,7 +1273,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                     Energy_Proposal = compute_energy(
                         temp_proposal[ind_ref],
                         temp_ref,
-                        sigma2_temp_proposal,
+                        sigma2_physical(sigma2_temp_proposal),
                         sigma2_distrib,
                     )  # calcul de l'énergie
                     # calcul de la probabilité d'accpetation
@@ -1266,12 +1297,12 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                                 layers=X[j].copy(), # copy: X[j] is overwritten in place on acceptance
                                 energy=Energy[j],
                                 ratio_accept=1,
-                                sigma2_temp=sigma2_temp_proposal,
+                                sigma2_temp=sigma2_physical(sigma2_temp_proposal),
                             )
                         )
 
                     else:
-                        dX = np.zeros((nb_layer, nb_param), np.float32)
+                        dX = np.zeros((nb_layer, nb_param), np.float64)
                         # On ne met pas à jour l'état :
                         self._states.append(self._states[-nb_chain])
                         # On remet les anciens paramètres pour la colonne :
@@ -1312,11 +1343,12 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
 
         else:  # cas single chain
             _temp_iter = np.zeros(
-                (self._nb_cells, len(self._times)), np.float32
+                (self._nb_cells, len(self._times)), np.float64
             )  # dernière température acceptée pour la colonne
             _flow_iter = np.zeros(
-                (self._nb_cells, len(self._times)), np.float32
+                (self._nb_cells, len(self._times)), np.float64
             )  # dernier débit accepté pour la colonne
+            # float32: these samples only feed the quantiles, and their size grows with the length of the series
             _temp = np.zeros(
                 (sizesubsampling, self._nb_cells, len(self._times)), np.float32
             )  # stockage des températures sous échantillonées pendant la mcmc
@@ -1337,11 +1369,11 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                         energy=compute_energy(
                             self.temperatures_solve[ind_ref, :],
                             temp_ref,
-                            sigma2=init_sigma2_temp,
+                            sigma2=sigma2_physical(init_sigma2_temp),
                             sigma2_distrib=sigma2_distrib,
                         ),
                         ratio_accept=1,
-                        sigma2_temp=init_sigma2_temp,
+                        sigma2_temp=sigma2_physical(init_sigma2_temp),
                     )
                 )
 
@@ -1366,7 +1398,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                 # on fait une proposition de pas
                 self.perturb_params()
                 sigma2_temp_proposal = sigma2_temp_prior.perturb(
-                    self._states[-1].sigma2_temp
+                    sigma2_temp_prior.physical_to_mcmc(self._states[-1].sigma2_temp)
                 )
 
                 # on calcule l'énergie pour les nouveaux paramètres
@@ -1375,7 +1407,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                 Energy_Proposal = compute_energy(
                     self.temperatures_solve[ind_ref, :],
                     temp_ref,
-                    sigma2_temp_proposal,
+                    sigma2_physical(sigma2_temp_proposal),
                     sigma2_distrib=sigma2_temp_prior.density,
                 )
 
@@ -1394,7 +1426,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                             layers=self._get_list_mcmc_params(),
                             energy=Energy_Proposal,
                             ratio_accept=nb_accepted / (i + 1),
-                            sigma2_temp=sigma2_temp_proposal,
+                            sigma2_temp=sigma2_physical(sigma2_temp_proposal),
                         )
                     )
 
@@ -1406,7 +1438,7 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
                         layer.mcmc_params = Param(*X[l])
 
                 if i % n_sous_ech_iter == 0:
-                    # Si i+1 est un multiple de n_sous_ech_iter, on stocke
+                    # Si i est un multiple de n_sous_ech_iter, on stocke
                     k = i // n_sous_ech_iter
                     _temp[k] = _temp_iter[::n_sous_ech_space, ::n_sous_ech_time]
                     _flows[k] = _flow_iter[::n_sous_ech_space, ::n_sous_ech_time]
@@ -1568,33 +1600,18 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
 
     @compute_mcmc.needed
     def get_RMSE_quantile(self, quantile):
-        # Number of sensors (except boundary conditions : river and aquifer)
-        nb_sensors = len(self._T_measures[0])
-
-        # Number of times for which we have measures
-        nb_times = len(self._T_measures)
-
-        # Array of RMSE for each sensor
+        # Array of RMSE for each sensor (except boundary conditions : river and aquifer), over its measured times
         list_RMSE = np.array(
             [
-                np.sqrt(
-                    np.nansum(
-                        (
-                            self.get_temperatures_quantile(quantile)[id, :]
-                            - temperatures_obs
-                        )
-                        ** 2
-                    )
-                    / nb_times
-                )
+                rmse_measured(self.get_temperatures_quantile(quantile)[id, :], temperatures_obs)
                 for id, temperatures_obs in zip(
                     self.get_id_sensors(), self._T_measures.T
                 )
             ]
         )
 
-        # Total RMSE
-        total_RMSE = np.sqrt(np.sum(list_RMSE**2) / nb_sensors)
+        # Total RMSE, over the sensors with measurements
+        total_RMSE = np.sqrt(np.mean(list_RMSE[~np.isnan(list_RMSE)] ** 2))
 
         return np.append(list_RMSE, total_RMSE)
 
@@ -2204,10 +2221,22 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
             layer.perturb()
 
 
+def rmse_measured(temp_simul, temp_obs):
+    """Root mean square of temp_simul - temp_obs over the measured values of temp_obs (nan if none is measured)."""
+    measured = ~np.isnan(temp_obs)
+    if not measured.any():
+        return np.nan
+    return np.sqrt(np.mean((temp_simul[measured] - temp_obs[measured]) ** 2))
+
+
 def compute_energy(temp_simul, temp_ref, sigma2, sigma2_distrib):
-    norm2 = np.linalg.norm(temp_ref - temp_simul) ** 2
+    """Negative log-posterior of the temperature measurements: Gaussian errors of variance sigma2, without the
+    constant (n/2) log(2 pi), and the prior density of sigma2. Missing measurements (NaN in temp_ref) are left out,
+    and n is the number of measured values; a NaN of the model is not."""
+    measured = ~np.isnan(temp_ref)
+    norm2 = np.linalg.norm(temp_ref[measured] - temp_simul[measured]) ** 2
     return (
-        (size(temp_ref) * log(sigma2))
+        (np.count_nonzero(measured) * log(sigma2) / 2)
         + norm2 / (2 * sigma2)
         - log(sigma2_distrib(sigma2))
     )

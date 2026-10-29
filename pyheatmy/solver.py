@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from numba import njit
-from numpy import ones, zeros, float32
+from numpy import ones, zeros, float64
 
 
 @njit
@@ -12,10 +12,10 @@ def solver(a, b, c, d):
     """
     nf = len(d)
 
-    ac = a.astype(float32)
-    bc = b.astype(float32)
-    cc = c.astype(float32)
-    dc = d.astype(float32)
+    ac = a.astype(float64)
+    bc = b.astype(float64)
+    cc = c.astype(float64)
+    dc = d.astype(float64)
 
     for it in range(1, nf):
         mc = ac[it - 1] / bc[it - 1]
@@ -39,12 +39,12 @@ def tri_product(a, b, c, d):
         - B is a vector represented by d
     """
     n = len(d)
-    res = zeros(n, dtype=float32)
+    res = zeros(n, dtype=float64)
 
-    ac = a.astype(float32)
-    bc = b.astype(float32)
-    cc = c.astype(float32)
-    dc = d.astype(float32)
+    ac = a.astype(float64)
+    bc = b.astype(float64)
+    cc = c.astype(float64)
+    dc = d.astype(float64)
 
     res[0] = dc[0] * bc[0] + dc[1] * cc[0]
     res[n - 1] = dc[n - 1] * bc[n - 1] + dc[n - 2] * ac[n - 2]

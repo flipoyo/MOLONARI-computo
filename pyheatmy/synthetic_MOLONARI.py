@@ -134,9 +134,9 @@ class synthetic_MOLONARI:  # on simule un tableau de mesures
                  print(f"Temperature of Sensor {i} : {self._T_Shaft[:,i]}")
         self._T_Shaft_measures = list(zip(self._dates, self._T_Shaft))
 
-    def _perturbate(self,ts, sigma):#perturbates the time series with a normal distrib of sigma
+    def _perturbate(self,ts, sigma):#returns a copy of the time series perturbated with a normal distrib of sigma
         n_t=len(ts)
-        new_ts=ts
+        new_ts=ts.copy()
         if sigma != None:
             new_ts+=normal(0,sigma,n_t)
         return new_ts

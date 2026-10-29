@@ -26,6 +26,7 @@ import numpy as np
 
 from pyheatmy.solver import solver, tri_product
 from pyheatmy.config import *
+from pyheatmy.params import calc_K
 
 # Classe définissant et initiant les paramètres physiques des systèmes linéaires de la classe H_stratified et T_stratified
 class Linear_system:
@@ -68,10 +69,7 @@ class Linear_system:
 
     # @njit
     def compute_K(self, IntrinK_list):
-        # IntrinK_list actually holds the physical intrinsic permeability (m2)
-        # in the higher-level code (Layer.get_physical_params returns IntrinK as a physical value).
-        # Therefore compute hydraulic conductivity K from intrinsic permeability directly.
-        return (RHO_W * G * IntrinK_list) * 1.0 / self.mu_list
+        return calc_K(IntrinK_list, self.mu_list)
 
     def compute_n_cell(self):
         return len(self.H_init)
@@ -163,8 +161,7 @@ class H_stratified(Linear_system):
         self.calc_param_adim()
 
     def compute_gamma_list(self):
-        # Use the physical intrinsic permeability (not -log10) when computing gamma
-        return MU_W * (self.L_0**2) * (self.Ss_list) / (RHO_W * (self.IntrinK_list) * G * self.P_0)
+        return (self.L_0**2) * (self.Ss_list) / (calc_K(self.IntrinK_list) * self.P_0)
     
     def compute_H_adim_res(self):
         H_adim_res = zeros((self.n_cell, self.n_times), float32)
@@ -441,9 +438,7 @@ class H_stratified(Linear_system):
         )
         # Addition of the non-dimensional number zeta
         # A positive q_s corresponds to a water source  
-        c += self.q_s_list * MU_W * self.L_0 ** 2 / (
-            (self.IntrinK_list) * self.DH_0 * G * RHO_W
-        )
+        c += self.q_s_list * self.L_0 ** 2 / (calc_K(self.IntrinK_list) * self.DH_0)
         return c
 
 
@@ -503,7 +498,7 @@ class T_stratified(Linear_system):
         self.calc_param_adim()
 
     def compute_kappa_list(self):
-        return (RHO_W**2) * C_W * (self.IntrinK_list) * G * self.DH_0 / (MU_W * self.lambda_m_list)
+        return RHO_W * C_W * calc_K(self.IntrinK_list) * self.DH_0 / self.lambda_m_list
 
     def compute_phi_list(self):
         return RHO_W * C_W * self.q_s_list * self.L_0 **2 / (MU_W * self.lambda_m_list)
