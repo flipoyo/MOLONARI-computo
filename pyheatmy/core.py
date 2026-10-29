@@ -96,17 +96,17 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
         self._quantiles_temperatures = None
         # dictionnaire indexé par les quantiles (0.05,0.5,0.95) à qui on a associe un array de deux dimensions : dimension 1 les profondeurs, dimension 2 : liste des valeurs de débits spécifiques associés au quantile, de longueur les temps de mesure
         self._quantiles_flows = None
+        self.tests([t for t, _ in T_measures])  # teste que les conditions nécessaires à l'analyse sont remplies
+        # températures connues au premier temps; un capteur sans mesure (NaN) est laissé de côté
+        T_first = np.array([self._T_riv[0], *self._T_measures[0], self._T_aq[0]])
+        measured = ~np.isnan(T_first)
         self.lagr = Lagrange(
-            np.array(self._real_z),
-            np.array([self._T_riv[0], *self._T_measures[0], self._T_aq[0]]),
+            self._real_z[measured], T_first[measured]
         )  # crée le polynome interpolateur de lagrange faisant coincider les températures connues à la profondeur réelle
-        self.linear = interp1d(
-            self._real_z, [self._T_riv[0], *self._T_measures[0], self._T_aq[0]]
-        )
+        self.linear = interp1d(self._real_z[measured], T_first[measured])
         # crée la fonction affine par morceaux faisant coincider les températures connues à la profondeur réelle
         self.inter_mode = inter_mode
         self.eps = eps
-        self.tests()  # teste que les conditions nécessaires à l'analyse sont remplies
         if verbose:
             print("Column created with success")
             print(f"Number of time steps: {self.get_timelength()}")
@@ -156,23 +156,51 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
     def initialization(self, nb_cells):
         self._nb_cells = nb_cells
 
-    def tests(self):
-        # teste que les données sont aux bons formats
-        if np.shape(self._dH) != np.shape(self._T_aq) or (
-            np.shape(self._dH) != np.shape(self._T_riv)
-            # or (np.shape(self._T_measures[1]) != (3,))
+    def tests(self, T_dates):
+        """Checks the measurements before any computation. The dates of dH_measures and T_measures must be the
+        same and strictly increasing, and the boundary conditions (head differential, river and aquifer
+        temperatures) are needed at every time. Missing temperatures at the sensors (NaN) are left out of the
+        initial profile, the energy of the MCMC and the RMSE, with a warning."""
+        if len(T_dates) != len(self._times):
+            raise ValueError(
+                f"dH_measures and T_measures must have the same number of times, got {len(self._times)} and "
+                f"{len(T_dates)}."
+            )
+        for j in range(1, len(self._times)):
+            if not self._times[j] > self._times[j - 1]:
+                raise ValueError(
+                    f"The dates of the measurements must be strictly increasing: date {j} ({self._times[j]}) is "
+                    f"not after date {j - 1} ({self._times[j - 1]})."
+                )
+        for j, (date_dH, date_T) in enumerate(zip(self._times, T_dates)):
+            if date_dH != date_T:
+                raise ValueError(
+                    f"dH_measures and T_measures must have the same dates; they differ at index {j}: {date_dH} "
+                    f"and {date_T}."
+                )
+        if self._T_measures.shape[1] + 1 != len(self.depth_sensors):
+            raise ValueError(
+                f"Each value of T_measures must have one temperature per depth of depth_sensors, the last one for "
+                f"the aquifer: {len(self.depth_sensors)} depths, but {self._T_measures.shape[1] + 1} temperatures."
+            )
+        for values, name in (
+            (self._dH, "head differential (dH_measures)"),
+            (self._T_riv, "river temperature (dH_measures)"),
+            (self._T_aq, "aquifer temperature (last value of T_measures)"),
         ):
-            raise NameError("Problème dans la taille des donées")
-
-        # teste qu'il ne manque pas de données pour les conditions aux limites
-        if np.isnan(np.sum(self._T_aq)):
-            raise NameError("Donnée(s) manquante(s) pour la température aquifère")
-
-        if np.isnan(np.sum(self._T_riv)):
-            raise NameError("Donnée(s) manquante(s) pour la température rivière")
-
-        if np.isnan(np.sum(self._dH)):
-            raise NameError("Donnée(s) manquante(s) pour la pression")
+            if np.isnan(values).any():
+                raise ValueError(
+                    f"Missing values (NaN) in the {name}: the boundary conditions are needed at every time."
+                )
+        missing = np.isnan(self._T_measures)
+        if missing.any():
+            empty = [f"{z} m" for z, none in zip(self.depth_sensors, missing.all(axis=0)) if none]
+            warnings.warn(
+                f"{missing.sum()} of {missing.size} temperature measurements at the sensors are missing (NaN); "
+                f"they are left out of the initial profile, the energy of the MCMC and the RMSE."
+                + (f" Sensors without any measurement: {', '.join(empty)}." if empty else ""),
+                UserWarning,
+            )
 
     @classmethod
     def from_dict(cls, col_dict, verbose=False):
@@ -662,29 +690,18 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
             array with 4 elements which contains the RMSE for the non boundary sensors, and the total RMSE
         """
 
-        # Number of sensors (except boundary conditions : river and aquifer)
-        nb_sensors = len(self._T_measures[0])
-
-        # Number of times for which we have measures
-        nb_times = len(self._T_measures)
-
-        # Array of RMSE for each sensor
+        # Array of RMSE for each sensor (except boundary conditions : river and aquifer), over its measured times
         list_RMSE = np.array(
             [
-                np.sqrt(
-                    np.nansum(
-                        (self.get_temperatures_solve()[id, :] - temperatures_obs) ** 2
-                    )
-                    / nb_times
-                )
+                rmse_measured(self.get_temperatures_solve()[id, :], temperatures_obs)
                 for id, temperatures_obs in zip(
                     self.get_id_sensors(), self._T_measures.T
                 )
             ]
         )
 
-        # Total RMSE
-        total_RMSE = np.sqrt(np.nansum(list_RMSE**2) / nb_sensors)
+        # Total RMSE, over the sensors with measurements
+        total_RMSE = np.sqrt(np.mean(list_RMSE[~np.isnan(list_RMSE)] ** 2))
 
         return np.append(list_RMSE, total_RMSE)
 
@@ -1583,33 +1600,18 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
 
     @compute_mcmc.needed
     def get_RMSE_quantile(self, quantile):
-        # Number of sensors (except boundary conditions : river and aquifer)
-        nb_sensors = len(self._T_measures[0])
-
-        # Number of times for which we have measures
-        nb_times = len(self._T_measures)
-
-        # Array of RMSE for each sensor
+        # Array of RMSE for each sensor (except boundary conditions : river and aquifer), over its measured times
         list_RMSE = np.array(
             [
-                np.sqrt(
-                    np.nansum(
-                        (
-                            self.get_temperatures_quantile(quantile)[id, :]
-                            - temperatures_obs
-                        )
-                        ** 2
-                    )
-                    / nb_times
-                )
+                rmse_measured(self.get_temperatures_quantile(quantile)[id, :], temperatures_obs)
                 for id, temperatures_obs in zip(
                     self.get_id_sensors(), self._T_measures.T
                 )
             ]
         )
 
-        # Total RMSE
-        total_RMSE = np.sqrt(np.sum(list_RMSE**2) / nb_sensors)
+        # Total RMSE, over the sensors with measurements
+        total_RMSE = np.sqrt(np.mean(list_RMSE[~np.isnan(list_RMSE)] ** 2))
 
         return np.append(list_RMSE, total_RMSE)
 
@@ -2219,12 +2221,22 @@ class Column:  # colonne de sédiments verticale entre le lit de la rivière et 
             layer.perturb()
 
 
+def rmse_measured(temp_simul, temp_obs):
+    """Root mean square of temp_simul - temp_obs over the measured values of temp_obs (nan if none is measured)."""
+    measured = ~np.isnan(temp_obs)
+    if not measured.any():
+        return np.nan
+    return np.sqrt(np.mean((temp_simul[measured] - temp_obs[measured]) ** 2))
+
+
 def compute_energy(temp_simul, temp_ref, sigma2, sigma2_distrib):
     """Negative log-posterior of the temperature measurements: Gaussian errors of variance sigma2, without the
-    constant (n/2) log(2 pi), and the prior density of sigma2."""
-    norm2 = np.linalg.norm(temp_ref - temp_simul) ** 2
+    constant (n/2) log(2 pi), and the prior density of sigma2. Missing measurements (NaN in temp_ref) are left out,
+    and n is the number of measured values; a NaN of the model is not."""
+    measured = ~np.isnan(temp_ref)
+    norm2 = np.linalg.norm(temp_ref[measured] - temp_simul[measured]) ** 2
     return (
-        (size(temp_ref) * log(sigma2) / 2)
+        (np.count_nonzero(measured) * log(sigma2) / 2)
         + norm2 / (2 * sigma2)
         - log(sigma2_distrib(sigma2))
     )
