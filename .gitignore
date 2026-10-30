@@ -1,3 +1,10 @@
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
+.cgitsync/
+MOLONARI-computo.lgr
+tuto
+sources/bayesian_inversion
+sources/pyheatmy
+.DS_Store
+.vscode/
