@@ -1,5 +1,7 @@
 # Environment of the MOLONARI-computo tree: the tutorials and the tests run the two packages of sources/,
-# installed in editable mode, not the former pyheatmy/ folder of MOLONARI-computo.
+# installed in editable mode, not the former pyheatmy/ folder of MOLONARI-computo. integration_tests/ holds the
+# tests that use both packages together; they run from there, so that the former pyheatmy/ folder is not on the
+# path (tests/ is the test suite of that former folder).
 [workspace]
 name = "molonari-computo"
 channels = ["conda-forge"]
@@ -21,4 +23,5 @@ pyheatmy = { path = "sources/pyheatmy", editable = true }
 [tasks]
 test-bayesian-inversion = { cmd = "pytest tests", cwd = "sources/bayesian_inversion" }
 test-pyheatmy = { cmd = "pytest tests", cwd = "sources/pyheatmy" }
-test-all = { depends-on = ["test-bayesian-inversion", "test-pyheatmy"] }
+test-shared = { cmd = "pytest", cwd = "integration_tests" }
+test-all = { depends-on = ["test-bayesian-inversion", "test-pyheatmy", "test-shared"] }
