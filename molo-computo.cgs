@@ -1,0 +1,21 @@
+# MOLONARI-computo: the computing part of MOLONARI, as a tree of five repositories.
+#
+# Branch standard: the tree has one branch, the project's default_branch. Every repository below is a project
+# repository and follows it; none names a branch of its own. fallback_branch is the branch cloned when the
+# project branch does not exist yet in a repository.
+#
+# From a standalone ComplexGitSync clone:
+#     pixi run cgitsync bootstrap <path to>/molo-computo.cgs
+# then, at the root of the tree:
+#     pixi install
+#     pixi run test-all
+
+project = { name = "MOLONARI-computo", default_branch = "merge" }
+
+repos = [
+    { repository = "github:flipoyo/MOLONARI-computo", relative_path = ".", fallback_branch = "merge" },
+    { repository = "github:flipoyo/MOLO-pyheatmy", fallback_branch = "merge" },
+    { repository = "github:flipoyo/MOLO-bayesian", fallback_branch = "merge" },
+    { repository = "github:flipoyo/MOLO-data-process", fallback_branch = "merge" },
+    { repository = "github:flipoyo/MOLO-tuto-cmpt", fallback_branch = "merge" },
+]
