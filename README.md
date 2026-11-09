@@ -1,40 +1,55 @@
-# PyHeatMy
+# MOLONARI-computo
 
-This version of `pyheatmy` is a development release. Some features are either not yet implemented or are incomplete. Bugs may also be present; please feel free to report any issues you encounter.
+The computing part of MOLONARI: estimating the exchanges of water and heat between a river and its bed from the
+temperatures and the head difference measured in the river bed. This repository is the root of the MOLONARI-computo
+tree, in which cgitsync places the following repositories:
 
-We do not guarantee the accuracy of the calculated results at this stage. However, the data format will remain consistent throughout the full implementation. Consider this code as a template that will be stabilized once the features produce reliable results.
+| Path | Repository | Content |
+|---|---|---|
+| `sources/pyheatmy` | [MOLONARI-pyheatmy](https://github.com/YunusEmre4418/MOLONARI-pyheatmy) | `pyheatmy`, the direct model: heat and water transport in a 1D column of the river bed (`Column`, `Layer`, `Column.simulate`) |
+| `sources/bayesian_inversion` | [MOLONARI-bayesian-inversion](https://github.com/YunusEmre4418/MOLONARI-bayesian-inversion) | `bayesian_inversion`, the MCMC (DREAM, random walk Metropolis) that estimates the parameters of a model from its measurements; for a column, `run_mcmc(column.simulate, ...)` |
+| `tuto` | [MOLONARI-tuto](https://github.com/YunusEmre4418/MOLONARI-tuto) | tutorials: a synthetic data set generated with `pyheatmy`, its Bayesian inversion, and the inversion of the real data of `Point034` |
 
-`pyheatmy` is built around the monolithic `Column` class in `core.py`. It can be executed from this class. Calculation, data retrieval, and plotting are methods provided by the `Column` class.
+The two packages do not import each other; the tests that use them together are in `integration_tests/` here.
+Molonaviz 2 (MOLONARI-API) uses both of them as references for the tests of its own engine.
 
-## Installation :
+## Installation
+
+With [pixi](https://pixi.sh), at the root of the tree:
 
 ```sh
-cd ..
 pixi install
-pixi run python -c "import pyheatmy; print('pyheatmy ready')"
+pixi run test-all
 ```
 
-## Tutorial :
+`pixi.toml` installs the two packages from `sources/` in editable mode. `pixi run test-all` runs the tests of
+`pyheatmy`, then those of `bayesian_inversion`, then those of `integration_tests/`. The tutorials
+run with the Python of `.pixi/envs/default` as the kernel (see `tuto/README.md`). Each package can also be installed
+on its own with pip; its tests run on GitHub Actions at every push to its repository.
 
-There is a jupyter notebook called ``demoPyheatmy.ipynb`` which can be used to check the installation and see how the package works. This notebook describe direct simulation, and inversion with a simple MCMC. The multiple chain inversion is described in `DREAM_VX.ipynb`.
+## This repository
 
-## Please note :
+- `integration_tests/`: the tests of the two packages together, with copies of the data they read, run with
+  `pixi run test-shared`.
+- `data/`: processed data of real monitoring points (`Point021`, `Point034`).
+- `research/`: notebooks of the MOLONARI 2023 to 2025 editions, kept as a record of their work and not maintained;
+  they were written for former versions of `pyheatmy`. `adimensionnement/`: the equations in non-dimensional form;
+  `multilayer/`: a column of several layers; `physics/`: the dependence of the parameters on temperature, the
+  propagation of the error of the pressure measurement and the remanence time.
+- `TD4_analyse_donnees.ipynb`: a practical session on the processing of real sensor data before the direct model;
+  it needs raw data that are not in this repository, and is to move to MOLONARI-data.
 
-The folder 'research' contains projects that are not yet implemented in the src files of pyheatmy
-
-Among them, ``synthetic_cases_generator`` was issued in by the MOLONARI 2022 edition. It was implemented in pyheatmy in ``time_series.py``, which contains the class ``Time_series``. The folder contaons two tutorial notebooks :
-- ``demo_genData.ipynb`` for ``time_series.py`` experimental observation simulator
-- ``demo_val_direct.ipynb`` for ``val_analy.py`` analytical solution generator
-
-All the other projects are from the MOLONARI 2023 edition.
-
+The former `pyheatmy` package, version 0.9.7, the demonstration notebooks written for it, the descriptions of the
+sensors and shafts (`configuration/`), the LoRa emitter sample and the other research projects were in this
+repository until the release `MOLONARI-computo-2` of the tree; the tutorials of `tuto/` replace the notebooks, and
+all of them are in the history of this repository, for instance at the tag `MOLONARI-computo-1`.
 
 ## License
-EPL v2.0
+
+See [LICENSE](LICENSE).
 
 2021 Mathis Bourdin & Youri Tchouboukoff
 2022 Amélie Impéror, Antoine Poirier, Guillaume de Rochefort, Loris Megy, Paul Bonin Ciosi, Valentin Alleaume, Xinbei Jiang
 2023 Mattéo Leturcq-Daligaux, Nicolas Matte, Mathis Chevé, Zhan Jing, Dan Maurel
 
 Project manager : Nicolas Flipo
- 
