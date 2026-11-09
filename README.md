@@ -6,9 +6,9 @@ tree, in which cgitsync places the following repositories:
 
 | Path | Repository | Content |
 |---|---|---|
-| `sources/pyheatmy` | [MOLONARI-pyheatmy](https://github.com/YunusEmre4418/MOLONARI-pyheatmy) | `pyheatmy`, the direct model: heat and water transport in a 1D column of the river bed (`Column`, `Layer`, `Column.simulate`) |
-| `sources/bayesian_inversion` | [MOLONARI-bayesian-inversion](https://github.com/YunusEmre4418/MOLONARI-bayesian-inversion) | `bayesian_inversion`, the MCMC (DREAM, random walk Metropolis) that estimates the parameters of a model from its measurements; for a column, `run_mcmc(column.simulate, ...)` |
-| `tuto` | [MOLONARI-tuto](https://github.com/YunusEmre4418/MOLONARI-tuto) | tutorials: a synthetic data set generated with `pyheatmy`, its Bayesian inversion, and the inversion of the real data of `Point034` |
+| `sources/pyheatmy` | [MOLONARI-computo-pyheatmy](https://github.com/flipoyo/MOLONARI-computo-pyheatmy) | `pyheatmy`, the direct model: heat and water transport in a 1D column of the river bed (`Column`, `Layer`, `Column.simulate`) |
+| `sources/bayesian_inversion` | [MOLONARI-computo-bayesian-inversion](https://github.com/flipoyo/MOLONARI-computo-bayesian-inversion) | `bayesian_inversion`, the MCMC (DREAM, random walk Metropolis) that estimates the parameters of a model from its measurements; for a column, `run_mcmc(column.simulate, ...)` |
+| `tuto` | [MOLONARI-computo-tuto](https://github.com/flipoyo/MOLONARI-computo-tuto) | tutorials: a synthetic data set generated with `pyheatmy`, its Bayesian inversion, and the inversion of the real data of `Point034` |
 
 The two packages do not import each other; the tests that use them together are in `integration_tests/` here.
 Molonaviz 2 (MOLONARI-API) uses both of them as references for the tests of its own engine.
