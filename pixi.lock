@@ -1202,8 +1202,8 @@ packages:
   timestamp: 1792690554487
 - pypi: ./MOLO-bayesian
   name: bayesian-inversion
-  version: 0.4.2
-  sha256: 1a47ce67cad21d60f6aa5a0ae420eee45dfc1fa6217ae28f471d8b16abe06f3e
+  version: 0.4.3
+  sha256: eea539b0b97cccdb4e7aaad9a7244e0ab61a264aa1c133ffd8216aa5f64b47e3
   requires_dist:
   - numpy
   - tqdm
@@ -5556,8 +5556,8 @@ packages:
   timestamp: 1787725739779
 - pypi: ./MOLO-data-process
   name: molonari-pipeline
-  version: 0.1.0
-  sha256: 9fdc21f8b831a53de6a6558061e4478ff2b28895714b6da5c1d780570f1ee27a
+  version: 0.1.1
+  sha256: bd77ff2035ec23f851e4812fb07d96e7cf864c6804e30fad9b53e48f5e092060
   requires_dist:
   - numpy
   - pandas
@@ -6744,8 +6744,8 @@ packages:
   timestamp: 1786995678795
 - pypi: ./MOLO-pyheatmy
   name: pyheatmy
-  version: 0.12.1
-  sha256: 18066899e3fc3ec5bf37d2dc7a97c76f0fefa446059ded95ea88f19d9b35d8bc
+  version: 0.12.2
+  sha256: 2f691428928b613b409c29ebf804f3b8ab53cde0d77095c765852b6948d31e39
   requires_dist:
   - matplotlib
   - scipy

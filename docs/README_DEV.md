@@ -83,6 +83,18 @@ pixi run --manifest-path <path to>/ComplexGitSync/pixi.toml cgitsync commit -m "
 pixi run --manifest-path <path to>/ComplexGitSync/pixi.toml cgitsync push
 ```
 
+## This repository
+
+- `integration_tests/`: the tests of the packages together, with copies of the data they read, run with
+  `pixi run test-shared`.
+- `data/`: processed data of real monitoring points (`Point021`, `Point034`).
+- `research/`: notebooks of the MOLONARI 2023 to 2025 editions, kept as a record of their work and not maintained;
+  they were written for former versions of `pyheatmy`. `adimensionnement/`: the equations in non-dimensional form;
+  `multilayer/`: a column of several layers; `physics/`: the dependence of the parameters on temperature, the
+  propagation of the error of the pressure measurement and the remanence time.
+- `TD4_analyse_donnees.ipynb`: a practical session on the processing of real sensor data before the direct model;
+  it needs raw data that are not in this repository, and is to move to MOLONARI-data.
+
 ## History
 
 MOLONARI-computo comes from the `pyheatmy` folder of [MOLONARI1D](https://github.com/flipoyo/MOLONARI1D), developed
