@@ -1,6 +1,6 @@
 # MOLONARI-computo: the computing part of MOLONARI, as a tree of five repositories.
 #
-# Branch standard: the tree has one branch, the project's default_branch. Every repository below is a project
+# Branch standard: the tree has one branch, the project's default_branch (CGS-MOLO). Every repository below is a project
 # repository and follows it; none names a branch of its own. fallback_branch is the branch cloned when the
 # project branch does not exist yet in a repository.
 #
@@ -10,12 +10,12 @@
 #     pixi install
 #     pixi run test-all
 
-project = { name = "MOLONARI-computo", default_branch = "merge" }
+project = { name = "MOLONARI-computo", default_branch = "CGS-MOLO" }
 
 repos = [
-    { repository = "github:flipoyo/MOLONARI-computo", relative_path = ".", fallback_branch = "merge" },
-    { repository = "github:flipoyo/MOLO-pyheatmy", fallback_branch = "merge" },
-    { repository = "github:flipoyo/MOLO-bayesian", fallback_branch = "merge" },
-    { repository = "github:flipoyo/MOLO-data-process", fallback_branch = "merge" },
-    { repository = "github:flipoyo/MOLO-tuto-cmpt", fallback_branch = "merge" },
+    { repository = "github:flipoyo/MOLONARI-computo", relative_path = ".", fallback_branch = "CGS-MOLO" },
+    { repository = "github:flipoyo/MOLO-pyheatmy", fallback_branch = "CGS-MOLO" },
+    { repository = "github:flipoyo/MOLO-bayesian", fallback_branch = "CGS-MOLO" },
+    { repository = "github:flipoyo/MOLO-data-process", fallback_branch = "CGS-MOLO" },
+    { repository = "github:flipoyo/MOLO-tuto-cmpt", fallback_branch = "CGS-MOLO" },
 ]

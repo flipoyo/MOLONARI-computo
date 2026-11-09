@@ -6,3 +6,6 @@ MOLO-pyheatmy
 MOLO-tuto-cmpt
 MOLONARI-computo.lgr
 .pixi/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/

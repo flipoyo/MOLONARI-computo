@@ -53,7 +53,7 @@ pixi install
 pixi run cgitsync bootstrap <path to>/molo-computo.cgs
 ```
 
-`bootstrap` clones the five repositories at their place in a new workspace, every one on the branch `merge`, and
+`bootstrap` clones the five repositories at their place in a new workspace, every one on the branch `CGS-MOLO`, and
 prints the `export CGSHOME=...` line of the workspace.
 
 **2. The environment.** At the root of the tree:
@@ -72,7 +72,7 @@ alone (`pixi install`, then `pixi run test`); the one of `MOLO-tuto-cmpt` instal
 
 ## Working on the tree
 
-The tree has a single branch, `merge`, followed by every repository. The usual cycle runs each Git operation across
+The tree has a single branch, `CGS-MOLO`, followed by every repository. The usual cycle runs each Git operation across
 the five repositories at once, from anywhere inside the tree (see the
 [tutorials of ComplexGitSync](https://github.com/flipoyo/ComplexGitSync/tree/main/tutorials)):
 

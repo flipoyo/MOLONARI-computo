@@ -1,8 +1,0 @@
-project = { name = "MOLONARI-computo", default_branch = "CGS-MOLO" }
-
-repos = [
-    { repository = "github:flipoyo/MOLONARI-computo", relative_path = ".", fallback_branch = "CGS-MOLO" },
-    { repository = "github:flipoyo/MOLONARI-computo-tuto", relative_path = "tuto", fallback_branch = "CGS-MOLO" },
-    { repository = "github:flipoyo/MOLONARI-computo-bayesian-inversion", relative_path = "sources/bayesian_inversion", fallback_branch = "CGS-MOLO" },
-    { repository = "github:flipoyo/MOLONARI-computo-pyheatmy", relative_path = "sources/pyheatmy", fallback_branch = "CGS-MOLO" },
-]
