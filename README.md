@@ -15,7 +15,15 @@ Molonaviz 2 (MOLONARI-API) uses both of them as references for the tests of its 
 
 ## Installation
 
-With [pixi](https://pixi.sh), at the root of the tree:
+The tree is described by `install_molonari_computo.cgs`, at the root of this repository. With
+[ComplexGitSync](https://github.com/flipoyo/ComplexGitSync), run from its own clone:
+
+```sh
+cgitsync bootstrap <path to>/install_molonari_computo.cgs
+```
+
+clones the four repositories at their place in a new workspace, on their branch `CGS-MOLO`. Then, with
+[pixi](https://pixi.sh), at the root of the tree:
 
 ```sh
 pixi install
