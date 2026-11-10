@@ -270,9 +270,9 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/zipp-4.1.2-pyh5ded981_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/zlib-ng-2.3.3-hce19668_1.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/zstd-1.5.7-hb78ec9c_7.conda
-      - pypi: ./MOLO-bayesian
-      - pypi: ./MOLO-data-process
-      - pypi: ./MOLO-pyheatmy
+      - pypi: ./bayesian-inversion
+      - pypi: ./data-pre-proc
+      - pypi: ./pyheatmy
       osx-64:
       - conda: https://conda.anaconda.org/conda-forge/osx-64/_openmp_mutex-4.5-8_kmp_llvm.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/_python_abi3_support-1.0-hd8ed1ab_3.conda
@@ -484,9 +484,9 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/zipp-4.1.2-pyh5ded981_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/zlib-ng-2.3.3-h646e873_1.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/zstd-1.5.7-hbc1a06c_7.conda
-      - pypi: ./MOLO-bayesian
-      - pypi: ./MOLO-data-process
-      - pypi: ./MOLO-pyheatmy
+      - pypi: ./bayesian-inversion
+      - pypi: ./data-pre-proc
+      - pypi: ./pyheatmy
       osx-arm64:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/_openmp_mutex-4.5-8_kmp_llvm.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/_python_abi3_support-1.0-hd8ed1ab_3.conda
@@ -698,9 +698,9 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/zipp-4.1.2-pyh5ded981_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/zlib-ng-2.3.3-h31dac16_1.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/zstd-1.5.7-hf451053_7.conda
-      - pypi: ./MOLO-bayesian
-      - pypi: ./MOLO-data-process
-      - pypi: ./MOLO-pyheatmy
+      - pypi: ./bayesian-inversion
+      - pypi: ./data-pre-proc
+      - pypi: ./pyheatmy
       win-64:
       - conda: https://conda.anaconda.org/conda-forge/noarch/_python_abi3_support-1.0-hd8ed1ab_3.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/anyio-4.16.0-pyh5ded981_1.conda
@@ -914,9 +914,9 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/win-64/zlib-1.3.2-hfd05255_3.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/zlib-ng-2.3.3-h0261ad2_1.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/zstd-1.5.7-h534d264_7.conda
-      - pypi: ./MOLO-bayesian
-      - pypi: ./MOLO-data-process
-      - pypi: ./MOLO-pyheatmy
+      - pypi: ./bayesian-inversion
+      - pypi: ./data-pre-proc
+      - pypi: ./pyheatmy
 packages:
 - conda: https://conda.anaconda.org/conda-forge/linux-64/_openmp_mutex-4.5-20_gnu.conda
   build_number: 20
@@ -1200,7 +1200,7 @@ packages:
   - pkg:pypi/backports-zstd?source=compressed-mapping
   size: 244387
   timestamp: 1792690554487
-- pypi: ./MOLO-bayesian
+- pypi: ./bayesian-inversion
   name: bayesian-inversion
   version: 0.4.3
   sha256: eea539b0b97cccdb4e7aaad9a7244e0ab61a264aa1c133ffd8216aa5f64b47e3
@@ -5554,7 +5554,7 @@ packages:
   purls: []
   size: 114686732
   timestamp: 1787725739779
-- pypi: ./MOLO-data-process
+- pypi: ./data-pre-proc
   name: molonari-pipeline
   version: 0.1.1
   sha256: bd77ff2035ec23f851e4812fb07d96e7cf864c6804e30fad9b53e48f5e092060
@@ -6742,7 +6742,7 @@ packages:
   - pkg:pypi/pygments?source=compressed-mapping
   size: 959376
   timestamp: 1786995678795
-- pypi: ./MOLO-pyheatmy
+- pypi: ./pyheatmy
   name: pyheatmy
   version: 0.12.2
   sha256: 2f691428928b613b409c29ebf804f3b8ab53cde0d77095c765852b6948d31e39

@@ -25,20 +25,20 @@ ipykernel = "*"
 setuptools = "*"
 
 [pypi-dependencies]
-pyheatmy = { path = "MOLO-pyheatmy", editable = true }
-bayesian_inversion = { path = "MOLO-bayesian", editable = true }
-molonari-pipeline = { path = "MOLO-data-process", editable = true }
+pyheatmy = { path = "pyheatmy", editable = true }
+bayesian_inversion = { path = "bayesian-inversion", editable = true }
+molonari-pipeline = { path = "data-pre-proc", editable = true }
 
 [tasks]
 # SemVer of this repository: pixi.toml is the reference, see scripts/bump_version.py
 bump-version = "python scripts/bump_version.py"
 check-version = "python scripts/bump_version.py --check"
-test-pyheatmy = { cmd = "pytest tests", cwd = "MOLO-pyheatmy" }
-test-bayesian = { cmd = "pytest tests", cwd = "MOLO-bayesian" }
-test-data-process = { cmd = "python -m unittest discover -s tests -t .", cwd = "MOLO-data-process" }
+test-pyheatmy = { cmd = "pytest tests", cwd = "pyheatmy" }
+test-bayesian = { cmd = "pytest tests", cwd = "bayesian-inversion" }
+test-data-process = { cmd = "python -m unittest discover -s tests -t .", cwd = "data-pre-proc" }
 # the tests that use pyheatmy and bayesian_inversion together, with their own copy of the Point034 data
 test-shared = { cmd = "pytest", cwd = "integration_tests" }
 test-all = { depends-on = ["test-pyheatmy", "test-bayesian", "test-data-process", "test-shared"] }
 # the two inversions run an MCMC of about four minutes each
-test-tuto = { cmd = "pytest --nbmake 01_generate_data.ipynb 02_inversion.ipynb 03_real_data.ipynb", cwd = "MOLO-tuto-cmpt" }
-lab = { cmd = "jupyter lab", cwd = "MOLO-tuto-cmpt" }
+test-tuto = { cmd = "pytest --nbmake 01_generate_data.ipynb 02_inversion.ipynb 03_real_data.ipynb", cwd = "TUTO" }
+lab = { cmd = "jupyter lab", cwd = "TUTO" }

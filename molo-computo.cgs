@@ -14,8 +14,8 @@ project = { name = "MOLONARI-computo", default_branch = "CGS-MOLO" }
 
 repos = [
     { repository = "github:flipoyo/MOLONARI-computo", relative_path = ".", fallback_branch = "CGS-MOLO" },
-    { repository = "github:flipoyo/MOLO-pyheatmy", fallback_branch = "CGS-MOLO" },
-    { repository = "github:flipoyo/MOLO-bayesian", fallback_branch = "CGS-MOLO" },
-    { repository = "github:flipoyo/MOLO-data-process", fallback_branch = "CGS-MOLO" },
-    { repository = "github:flipoyo/MOLO-tuto-cmpt", fallback_branch = "CGS-MOLO" },
+    { repository = "github:flipoyo/MOLO-pyheatmy", relative_path = "./pyheatmy", fallback_branch = "CGS-MOLO" },
+    { repository = "github:flipoyo/MOLO-bayesian", relative_path = "./bayesian-inversion", fallback_branch = "CGS-MOLO" },
+    { repository = "github:flipoyo/MOLO-data-process", relative_path = "./data-pre-proc", fallback_branch = "CGS-MOLO" },
+    { repository = "github:flipoyo/MOLO-tuto-cmpt", relative_path = "./TUTO", fallback_branch = "CGS-MOLO" },
 ]

@@ -61,13 +61,13 @@ prints the `export CGSHOME=...` line of the workspace.
 ```sh
 pixi install          # Python and the three packages of the tree, installed in editable mode
 pixi run test-all     # the tests of pyheatmy, bayesian_inversion and molonari-pipeline
-pixi run lab          # JupyterLab in MOLO-tuto-cmpt, to run the tutorials
+pixi run lab          # JupyterLab in TUTO, to run the tutorials
 pixi run test-tuto    # runs the three tutorials (the two MCMC take about four minutes each)
 ```
 
 The `pixi.toml` of the root installs the packages from the repositories next to it, so that a change in one of them
 is seen at once by the others and by the tutorials. Each repository also has a `pixi.toml` of its own, to work on it
-alone (`pixi install`, then `pixi run test`); the one of `MOLO-tuto-cmpt` installs `pyheatmy` and
+alone (`pixi install`, then `pixi run test`); the one of `TUTO` installs `pyheatmy` and
 `bayesian_inversion` from GitHub.
 
 ## Working on the tree

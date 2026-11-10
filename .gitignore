@@ -1,9 +1,9 @@
 .claude/
 .cgitsync/
-MOLO-bayesian
-MOLO-data-process
-MOLO-pyheatmy
-MOLO-tuto-cmpt
+bayesian-inversion
+data-pre-proc
+pyheatmy
+TUTO
 MOLONARI-computo.lgr
 .pixi/
 __pycache__/
